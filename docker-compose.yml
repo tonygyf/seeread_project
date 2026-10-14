@@ -1,0 +1,57 @@
+# SeeRead — GPU training / evaluation environment
+#
+# Prerequisites on the host: NVIDIA driver + NVIDIA Container Toolkit.
+# Commands (images are only pulled/built when you explicitly run these):
+#   docker compose build
+#   docker compose run --rm seeread python tests/test_smoke.py
+#   docker compose run --rm seeread python tools/train.py --config configs/seeread_joint.yaml
+#   docker compose run --rm seeread python tools/eval.py \
+#       --config configs/seeread_joint.yaml --ckpt results/run/last.pt \
+#       --ann data/annotations/latedspot_test.jsonl --out results/run/test.json
+# On a CPU-only host, remove the `deploy.resources` reservation block below.
+
+name: seeread
+
+services:
+  seeread:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.4.1-cuda12.4-cudnn9-runtime}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+        USER_UID: ${PUID:-1000}
+        USER_GID: ${PGID:-1000}
+    image: seeread:latest
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+    working_dir: /workspace
+    volumes:
+      # Datasets and frozen jsonl annotations (see docs/02_dataset_protocol.md)
+      - ./data:/workspace/data
+      # Checkpoints and metric outputs from tools/train.py / tools/eval.py
+      - ./results:/workspace/results
+      # Cached pretrained weights (TrOCR, ResNet50 backbone) between containers
+      - hf-cache:/home/appuser/.cache/huggingface
+      - torch-cache:/home/appuser/.cache/torch
+      # Live development: uncomment to shadow the baked-in source with the host
+      # checkout (configs/, seeread/, tools/, ...)
+      # - ./:/workspace
+    # Enough shared memory for DataLoader workers (configs/base.yaml: data.workers)
+    shm_size: "16g"
+    # GPU passthrough — Docker Compose v2 + NVIDIA Container Toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Same default as the Dockerfile quick start; override with any tools/ command
+    command: ["python", "tests/test_smoke.py"]
+
+volumes:
+  hf-cache:
+  torch-cache:

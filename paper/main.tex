@@ -1,0 +1,165 @@
+% IEEE journal format (IEEEtran). For CVPR/ICCV/ECCV/ACM MM/AAAI keep the section files' text and swap the preamble/author block.
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs,multirow,array}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\todo}[1]{{\color{red}[TODO: #1]}}
+\newcommand{\XX}{\textcolor{red}{XX.X}}
+\newcommand{\method}{\textsc{SeeRead}}
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+\title{See and Read in the Dark: End-to-End Low-Light Scene Text Spotting with Shared Illumination Context}
+
+\author{\IEEEauthorblockN{Author One, Author Two, \ldots, Chengpei Xu (advisor)}
+\thanks{\todo{affiliations, funding, corresponding author}}}
+
+\markboth{IEEE Transactions on (target venue), Vol.~XX, No.~X, 2026}{Author \MakeLowercase{\textit{et al.}}: See and Read in the Dark}
+\maketitle
+
+\begin{abstract}
+Reading text at night requires both finding it and recognizing it, yet prior low-light work treats the two steps in isolation: detectors are trained to localize text in the dark~\cite{xu2024seeing}, and recognizers are trained or paired with enhancers to read cropped text~\cite{fu2026reading}. The standard \emph{enhance--detect--read} cascade hands each stage an image optimized for human vision and lets errors accumulate. We study \emph{end-to-end low-light scene text spotting}. We (i) extend the real low-light LATeD benchmark with transcriptions (LATeD-Spot) and introduce ESTR-v2, a cross-domain real test set with dark/torch-lit frame pairs, together with an illumination-stratified evaluation protocol; and (ii) propose \method{}, which couples a spatially constrained, snake-convolution text detector with an illumination-aware crop enhancer through a shared global illumination context, a differentiable centerline rectification that routes the recognition loss into the detector, and a training-only cross-illumination consistency loss. \todo{Fill in headline numbers after experiments: e.g., +X.X E2E F-measure over the strongest cascade on LATeD-Spot, +X.X on ESTR-v2, at Y\% of the cost.} Code, annotations, and splits will be released.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Scene text spotting, low-light imaging, text detection, text recognition, benchmark.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{S}{cene} text underlies navigation, translation, and assistive applications that must work at night, where images suffer from low contrast, shot and read noise, blur, and color distortion. Recent work addresses the two halves of the problem separately. Xu~\emph{et al.}~\cite{xu2024seeing} localize text in the dark with a training-time spatial constraint and a snake-convolution feature pyramid; Fu~\emph{et al.}~\cite{fu2026reading} recognize cropped low-light text by jointly training a curve-based enhancer with a recognizer. Neither answers the question a deployed system faces: \emph{given a dark photo, how well can we localize \emph{and} read all its text, and where do the errors come from?}
+
+A direct answer is the cascade: enhance~\cite{guo2020zerodce,ma2022sci,wen2023srdace,fei2023gdp}, detect, then recognize. Enhancers are tuned for human perception, so brightening can help detection yet blur strokes that recognition needs~\cite{fu2026reading}; a small dark crop also carries little evidence of \emph{how dark} the scene is, so a crop-level enhancer must guess its exposure. \todo{Verify with a systematic literature search that no prior work benchmarks end-to-end low-light text spotting before claiming novelty.}
+
+We make four contributions:
+\begin{itemize}
+\item \textbf{Benchmark.} LATeD-Spot adds line-level transcriptions and language tags to the 13{,}923 text instances of LATeD~\cite{xu2024seeing}; ESTR-v2 provides \todo{N} real night scenes for cross-domain testing, \todo{M} of them as tripod-captured dark/torch-lit pairs; a fixed-seed synthetic suite provides controlled illumination levels. We propose illumination-stratified recall and an error-attribution protocol (missed / misread / correct).
+\item \textbf{Method.} \method{} couples detection and recognition through (a) a shared illumination context that conditions a crop enhancer, (b) centerline-anchored differentiable rectification, and (c) a training-only cross-illumination consistency (CIC) loss; the spatial-constrained module (SCM) adds no inference cost.
+\item \textbf{Analysis.} We quantify error propagation in enhance--detect--read cascades and chart end-to-end accuracy against scene illumination.
+\item \textbf{Release.} Code, annotations, frozen splits, and evaluation scripts, with three-seed results.
+\end{itemize}
+
+\section{Related Work}
+\subsection{Scene text detection and spotting}
+Arbitrary-shape detectors follow top-down contour regression~\cite{liao2020db,zhang2021textbpn,zhang2023bpnpp,ye2023dptext} or bottom-up component assembly~\cite{xu2024seeing}. End-to-end spotters share features between detection and recognition~\cite{liu2020abcnet,zhang2022testr,ye2023deepsolo,huang2023estextspotter}; they are trained and evaluated on well-lit data~\cite{liu2019ctw1500,chng2017totaltext}.
+\subsection{Low-light enhancement and text}
+Learning-based enhancers estimate curves~\cite{guo2020zerodce,li2021zerodcepp,wen2023srdace}, unrolled Retinex models~\cite{liu2021ruas,ma2022sci}, or diffusion priors~\cite{fei2023gdp}. Text-aware variants add text losses~\cite{hsu2022extremely,lin2025textdark}; LIST~\cite{liu2022list} and Xue~\emph{et al.}~\cite{xue2020arbitrarily} detect text in low light; Diffusion-in-the-Dark~\cite{nguyen2024did} and \cite{fu2026reading} target recognition.
+\subsection{Datasets}
+Low-light text datasets are scarce and mostly synthetic or detection-only (Table~\ref{tab:data}); LATeD~\cite{xu2024seeing} provides real polygons but, to our knowledge, no transcriptions.
+
+\section{Benchmark}
+\subsection{LATeD-Spot and ESTR-v2}
+\textbf{LATeD-Spot.} We keep the official split of 1{,}000/500 images and add transcriptions and language tags. Annotation follows pre-labeling, double independent verification, and third-party arbitration; we report agreement (NED) of \todo{X}. A fixed validation set of 100 images is drawn from the training split, stratified by scene and illumination.
+\textbf{ESTR-v2.} \todo{N} night scenes captured with \todo{devices}, never used for training. For \todo{M} scenes a tripod captures an ambient dark frame and a torch-lit frame; polygons are annotated once and reused after ECC alignment checks.
+\textbf{Dark-Synth.} Dark-CTW1500 and Dark-Total-Text are generated offline with fixed seeds at three levels using an optics$\rightarrow$sensor$\rightarrow$ISP model (blur, vignette, Poisson--Gaussian noise, gamma), calibrated against the luminance histogram of LATeD (Fig.~\ref{fig:illum}).
+\begin{table}[t]
+\centering\caption{Low-light text datasets (LATeD counts from~\cite{xu2024seeing}).}\label{tab:data}
+\setlength{\tabcolsep}{2pt}\footnotesize
+\begin{tabular}{lcccccc}\toprule
+Dataset & Real & Poly & Transcr. & Train/Test & Texts & Pairs\\\midrule
+Xue~\cite{xue2020arbitrarily} & dimmed & -- & -- & 300/200 & 766 & --\\
+LATeD~\cite{xu2024seeing} & \checkmark & \checkmark & -- & 1000/500 & 13{,}923 & --\\
+LATeD-Spot (ours) & \checkmark & \checkmark & \checkmark & 1000/500 & 13{,}923 & \todo{}\\
+ESTR-v2 (ours) & \checkmark & \checkmark & \checkmark & --/\todo{N} & \todo{} & \todo{M}\\
+Dark-Synth (ours) & synth & \checkmark & \checkmark & --/\todo{} & \todo{} & \checkmark\\\bottomrule
+\end{tabular}\end{table}
+
+\subsection{Protocol}
+Detection uses IoU$\ge0.5$ matching with don't-care regions; end-to-end (E2E) counts a match as correct if the normalized transcription is identical (no lexicon). Because precision cannot be assigned to an illumination bin, per-bin results report \emph{recall-type} metrics: detection recall, E2E recall, and CER on detected instances. Bins are defined on instance-level mean luminance $Y$ (extreme/dark/dim/lit; edges calibrated on real data). The error attribution splits ground truth into \emph{missed}, \emph{misread}, and \emph{correct}.
+
+\section{Method}
+\subsection{Overview}
+\method{} (Fig.~\ref{fig:arch}) comprises a detector $\Psi$, an illumination-aware enhancer $E$, and a recognizer $R$. Given a dark image $I$, $\Psi$ predicts a text map, a center map, and per-pixel height and direction; TSR turns them into polygons with centerlines $\{\mathbf{c}_k\}$ and heights $\{h_k\}$; each instance is rectified to a crop $x$, enhanced as $\hat{x}=E(x;\mathbf{z})$ with the image-level illumination context $\mathbf{z}$, and read by $R$.
+\begin{figure}[t]\centering
+\fbox{\parbox{0.95\linewidth}{\centering\vspace{3em}\todo{Architecture figure}\vspace{3em}}}
+\caption{Overview of \method{}. SCM and CIC are used only in training.}\label{fig:arch}\end{figure}
+
+\subsection{Spatially constrained snake detector}
+We adopt the detector of~\cite{xu2024seeing}: a ResNet-50 backbone, a dynamic-snake feature pyramid (DSF) whose blocks fuse a regular and a snake convolution~\cite{qi2023dsc} through a gated self-attention, a training-only spatial-constrained module (SCM) with reconstruction loss $\mathcal{L}_{sr}$ and semantic loss $\mathcal{L}_{ss}$, and bottom-up text shaping by rotated-rectangle accumulation (TSR) with farthest point sampling~\cite{eldar1997fps}. \todo{State precisely which components are re-implemented and how they differ from the official code (e.g., channel-wise attention, lightweight snake convolution).}
+
+\subsection{Illumination-aware enhancer}
+A crop $x\in[0,1]^{3\times H\times W}$ is enhanced by $T$ applications of the adaptive curve of~\cite{fu2026reading,wen2023srdace},
+\begin{equation}
+\begin{split}
+\mathrm{AAC}(I;\alpha,\beta)&=I+\tfrac{\alpha}{\beta}\,S(\beta;I)\,I\,(\beta-I),\\
+S(\beta;I)&=\sigma(-I+\beta-0.1),
+\end{split}
+\end{equation}
+whose per-pixel maps $(\alpha_t,\beta_t)_{t=1}^{T}$ are predicted by a residual network whose blocks are modulated by FiLM~\cite{perez2018film}: $\mathbf{h}\leftarrow \mathbf{h}\odot(1+\gamma(\mathbf{z}))+\delta(\mathbf{z})$. The context $\mathbf{z}=\mathrm{MLP}([\,g(\mathbf{c}_5);\,s(I)\,])$ concatenates the pooled deepest detector feature $\mathbf{c}_5$ and four global luminance statistics $s(I)$ (mean, std, max, min of a $16{\times}16$ luminance map). Because $\mathbf{z}$ is computed from the whole image, the crop enhancer knows how dark the scene is.
+
+\subsection{Centerline-anchored differentiable rectification}
+For an instance with ordered centers $\mathbf{c}_k$ and heights $h_k$ sampled bilinearly from the predicted height map, let $\mathbf{n}_k$ be the unit normal of the centerline. The strip boundaries are $\mathbf{t}_k=\mathbf{c}_k-\tfrac{\rho h_k}{2}\mathbf{n}_k$ and $\mathbf{b}_k=\mathbf{c}_k+\tfrac{\rho h_k}{2}\mathbf{n}_k$ ($\rho{=}1.15$); the crop is obtained by bilinear sampling on the grid interpolating $\mathbf{t}(u)$ and $\mathbf{b}(u)$ along arc length $u$. The grid is differentiable w.r.t.\ $h_k$, so the recognition loss reaches the detector's height head; the context $\mathbf{z}$ additionally propagates it into the backbone. During training the heights are switched from ground truth to predictions by a curriculum.
+
+\subsection{Cross-illumination consistency}
+When a lit counterpart $x^{\mathrm{lit}}$ of a crop is available (synthetic pairs or torch-lit frames), we align token features of the recognizer encoder $f(\cdot)$:
+\begin{equation}
+\mathcal{L}_{cic}=\frac{1}{N}\sum_{n}\Big(1-\cos\big(f(\hat{x})_n,\ \mathrm{sg}[f(x^{\mathrm{lit}})_n]\big)\Big).
+\end{equation}
+CIC is a training-only loss and adds no inference cost.
+
+\subsection{Objective and training}
+\begin{multline}
+\mathcal{L}=\lambda_{d}\big(\mathcal{L}_{seg}+\mathcal{L}_{H}+\mathcal{L}_{dir}+\mathcal{L}_{sr}+\mathcal{L}_{ss}\big)\\
++\lambda_{r}\mathcal{L}_{rec}+\lambda_{e}\mathcal{L}_{enh}+\lambda_{c}\mathcal{L}_{cic},
+\end{multline}
+where $\mathcal{L}_{rec}$ is the recognizer loss (CTC or token cross-entropy), and $\mathcal{L}_{enh}$ combines exposure, color-constancy, curve-smoothness, and Sobel edge-structure terms. Training has three stages: detector pre-training on darkened SynthText~\cite{gupta2016synthtext} and MLT~\cite{nayef2017mlt}; enhancer+recognizer training on ground-truth geometry; joint fine-tuning on LATeD-Spot. The recognizer is either a CTC model (multilingual) or TrOCR~\cite{li2023trocr} with LoRA~\cite{hu2022lora} (English).
+
+\section{Experiments}
+\subsection{Setup}
+\textbf{Data.} Train: LATeD-Spot train, darkened SynthText/MLT. Validation: 100 held-out LATeD images. Test: LATeD-Spot test (500), ESTR-v2, Dark-Synth, and well-lit CTW1500/Total-Text for non-regression. \textbf{Baselines.} (A) ground-truth boxes + recognizers (PARSeq~\cite{bautista2022parseq}, CTC, TrOCR); (B) cascades of {gamma, CLAHE, SSR, ZeroDCE, SCI, RUAS, SRDACE, GDP} $\times$ detector $\times$ recognizer; (C) end-to-end spotters fine-tuned on dark data (DeepSolo~\cite{ye2023deepsolo}, TESTR~\cite{zhang2022testr}, ESTextSpotter~\cite{huang2023estextspotter}). \textbf{Implementation.} \todo{GPU, batch, epochs, optimizer, resolution}. All numbers are mean$\pm$std over 3 seeds. \todo{State which baselines were re-run and which were taken from papers.}
+
+\subsection{Main results}
+\begin{table}[t]
+\centering\caption{End-to-end spotting on LATeD-Spot test and ESTR-v2 (no lexicon). \todo{All entries to be filled from experiments.}}\label{tab:main}
+\setlength{\tabcolsep}{2pt}\footnotesize
+\begin{tabular}{llcccccc}\toprule
+ & & \multicolumn{3}{c}{LATeD-Spot} & \multicolumn{3}{c}{ESTR-v2}\\\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+Type & Method & P & R & F & P & R & F\\\midrule
+Cascade & best LLIE + det + rec & \XX & \XX & \XX & \XX & \XX & \XX\\
+Spotter & DeepSolo (ft) & \XX & \XX & \XX & \XX & \XX & \XX\\
+Spotter & TESTR (ft) & \XX & \XX & \XX & \XX & \XX & \XX\\
+Spotter & ESTextSpotter (ft) & \XX & \XX & \XX & \XX & \XX & \XX\\
+Ours & \method{} & \XX & \XX & \XX & \XX & \XX & \XX\\\bottomrule
+\end{tabular}\end{table}
+
+\subsection{Illumination-stratified analysis}
+\begin{figure}[t]\centering
+\fbox{\parbox{0.95\linewidth}{\centering\vspace{3em}\todo{E2E recall vs.\ illumination bin, all methods}\vspace{3em}}}
+\caption{E2E recall by illumination bin; luminance histograms of real and synthetic data are in Fig.~\ref{fig:illum}.}\label{fig:illum}\end{figure}
+\todo{Discuss: where does the advantage appear (extreme bin?), is there a physical floor (RQ4)?}
+
+\subsection{Error attribution}
+\begin{table}[t]
+\centering\caption{Error attribution on LATeD-Spot test (\% of ground-truth instances).}\label{tab:err}
+\small\begin{tabular}{lccc}\toprule
+Method & Missed & Misread & Correct\\\midrule
+Cascade (best) & \XX & \XX & \XX\\
+\method{} & \XX & \XX & \XX\\\bottomrule\end{tabular}\end{table}
+\todo{Answer RQ1: does enhancement convert misses into misreads?}
+
+\subsection{Ablation}
+\begin{table}[t]
+\centering\caption{Ablation on LATeD-Spot test (E2E F; mean$\pm$std over 3 seeds).}\label{tab:abl}
+\footnotesize\setlength{\tabcolsep}{2pt}\begin{tabular}{lcccccc|c}\toprule
+ & SCM & DSF & TSR & Ctx & CSR & CIC & E2E-F\\\midrule
+Baseline & & & & & & & \XX\\
++ SCM, DSF, TSR & \checkmark & \checkmark & \checkmark & & & & \XX\\
++ IAE context & \checkmark & \checkmark & \checkmark & \checkmark & & & \XX\\
++ CSR & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & & \XX\\
+Full & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \XX\\\bottomrule\end{tabular}\end{table}
+
+\subsection{Efficiency and non-regression}
+\todo{Params, FPS (batch 1, including post-processing), memory; results on well-lit CTW1500/Total-Text to show no regression.}
+
+\subsection{Limitations}
+\todo{Vertical text; recognizer language coverage; heavy motion blur; physical limits at extreme darkness; annotation noise on ambiguous text.}
+
+\section{Conclusion}
+We introduced a benchmark and a coupled detector--enhancer--recognizer for low-light scene text spotting. \todo{Summarize findings once experiments are done.}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+\end{document}

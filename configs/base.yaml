@@ -1,0 +1,41 @@
+data:
+  root: data/
+  train_ann: data/annotations/latedspot_train.jsonl      # real dark + (optional) lit-source items for online darkening
+  val_ann:   data/annotations/latedspot_val.jsonl
+  test_ann:  data/annotations/latedspot_test.jsonl
+  size: 640
+  synth_mode: physical        # physical | legacy
+  workers: 4
+model:
+  det_ch: 128
+  pretrained: true
+  ctx_dim: 128
+  crop_hw: [64, 256]
+  enh_iters: 6
+  use_ctx: true               # ablation: IAE conditioned on detector context
+  use_scm: true               # ablation: spatial-constrained module (train only)
+rec:
+  type: crnn                  # crnn | trocr
+  charset_file: null
+  name: microsoft/trocr-base-printed
+  lora_r: 16
+  lora_alpha: 32
+  freeze: false
+loss:
+  det: 1.0
+  rec: 1.0
+  enh: 0.1
+  cic: 0.5                    # 0 disables cross-illumination consistency (ablation)
+train:
+  stage: joint                # det | rec | joint
+  epochs: 100
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  pred_geom_warmup: 0.5       # fraction of training over which P(use predicted heights) ramps 0 -> 1
+  amp: false
+  seed: 0
+  out_dir: results/run
+  resume: null
+  init_det: null              # stage-1 detector checkpoint
+  init_rec: null

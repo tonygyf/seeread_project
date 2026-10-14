@@ -1,0 +1,31 @@
+# --- Version control / IDE / agent metadata ---
+.git
+.gitignore
+.github/
+.trae/
+.vscode/
+.idea/
+
+# --- Local environment (never bake secrets into the image) ---
+.env
+.env.*
+!.env.example
+
+# --- Python caches / test artifacts ---
+**/__pycache__/
+**/*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# --- Datasets, checkpoints and experiment outputs are bind-mounted at runtime ---
+data/
+results/
+
+# --- Paper sources are irrelevant to the training/eval image ---
+paper/
+
+# --- OS / misc ---
+.DS_Store
+*.log
