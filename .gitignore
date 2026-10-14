@@ -15,15 +15,19 @@ dist/
 .env.*
 !.env.example
 
-# --- Datasets & experiment outputs: keep the directory, ignore contents ---
+# --- Datasets & experiment outputs: keep the directory skeleton, ignore contents ---
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/README.md
 data/annotations/*
 !data/annotations/.gitkeep
+!data/annotations/README.md
 data/images/*
 !data/images/.gitkeep
+!data/images/README.md
 data/images_lit/*
 !data/images_lit/.gitkeep
+!data/images_lit/README.md
 results/*
 !results/.gitkeep
 
