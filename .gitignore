@@ -1,0 +1,33 @@
+# --- Python caches / build artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# --- Local environment (template .env.example is tracked) ---
+.env
+.env.*
+!.env.example
+
+# --- Datasets & experiment outputs: keep the directory, ignore contents ---
+data/raw/*
+!data/raw/.gitkeep
+data/annotations/*
+!data/annotations/.gitkeep
+data/images/*
+!data/images/.gitkeep
+data/images_lit/*
+!data/images_lit/.gitkeep
+results/*
+!results/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.log
