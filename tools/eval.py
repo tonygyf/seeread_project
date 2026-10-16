@@ -9,13 +9,15 @@ from seeread.data.datasets import SeeReadDataset, collate
 from seeread.metrics.spotting import SpottingEvaluator
 from seeread.models.recognizer import build_recognizer
 from seeread.models.seeread import SeeRead
+from tools.train import parse_set
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True); ap.add_argument("--ckpt", required=True)
     ap.add_argument("--ann", required=True); ap.add_argument("--out", required=True); ap.add_argument("--bs", type=int, default=4)
-    a = ap.parse_args(); cfg = load_config(a.config)
+    ap.add_argument("--set", nargs="*")
+    a = ap.parse_args(); cfg = load_config(a.config, parse_set(a.set))
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     model = SeeRead(build_recognizer(cfg.rec), cfg).to(dev)
     sd = torch.load(a.ckpt, map_location=dev)

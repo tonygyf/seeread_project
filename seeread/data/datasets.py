@@ -13,6 +13,8 @@ from torch.utils.data import Dataset
 from .geometry import make_det_targets, centerline_and_height
 from .lowlight_synth import darken
 
+cv2.setNumThreads(1)          # cap OpenCV TBB pools (each DataLoader worker inherits this); keeps PID/thread budget bounded
+
 
 def _read_rgb(path):
     img = cv2.imread(path, cv2.IMREAD_COLOR)
@@ -61,7 +63,7 @@ class SeeReadDataset(Dataset):
         img = _read_rgb(os.path.join(self.root, it["image"]))
         meta = dict(it.get("meta", {}))
         lit = None
-        if meta.get("illum_kind") == "lit":          # online darkening, keep the lit image as the pair
+        if meta.get("illum_kind") == "lit" and self.train:   # online darkening (train only); eval keeps the lit image as-is
             lit = img
             img, m = darken(lit, rng, mode=self.synth_mode)
             meta.update(m)
@@ -79,9 +81,12 @@ class SeeReadDataset(Dataset):
             if x1 < 0 or y1 < 0 or x0 > self.size or y0 > self.size:
                 continue
             inside = x0 >= 0 and y0 >= 0 and x1 <= self.size and y1 <= self.size
-            ign = bool(ins.get("ignore")) or ins.get("text", "") in ("###", "") or not inside
-            inst_det.append(dict(poly=poly, ignore=ign))
-            if not ign:
+            # Det geometry is learned for in-canvas text, including textless ("###") GT like LATeD/CTW.
+            # Explicit ignore=true (protocol don't-care, e.g. TotalText '#') opts out of det AND rec;
+            # "###"/"" with ignore=false is a positive det target but excluded from rec (P0-13/P0-14 split).
+            inst_det.append(dict(poly=poly, ignore=(not inside) or bool(ins.get("ignore"))))
+            textless = bool(ins.get("ignore")) or ins.get("text", "") in ("###", "")
+            if not textless:
                 c, hh = centerline_and_height(poly, self.rec_k)
                 if hh.mean() >= self.min_h:
                     inst_rec.append(dict(centers=c.astype(np.float32), heights=hh.astype(np.float32), text=ins["text"]))
@@ -103,6 +108,8 @@ def collate(batch):
                scale=[b["scale"] for b in batch], offset=[b["offset"] for b in batch],
                orig_size=[b["orig_size"] for b in batch], gt_orig=[b["gt_orig"] for b in batch],
                index=[b["index"] for b in batch])
-    if all("lit" in b for b in batch):
-        out["lit"] = torch.stack([b["lit"] for b in batch])
+    lit = [b.get("lit") for b in batch]
+    if any(v is not None for v in lit):          # mixed batch: pad unpaired slots; lit_mask keeps CIC to paired samples
+        out["lit"] = torch.stack([v if v is not None else torch.zeros_like(bb["image"]) for v, bb in zip(lit, batch)])
+        out["lit_mask"] = torch.tensor([v is not None for v in lit])
     return out

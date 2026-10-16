@@ -35,3 +35,11 @@ results/*
 .DS_Store
 Thumbs.db
 *.log
+
+# --- Local tooling / generated caches (never tracked) ---
+.cache_ctl/
+.trae/
+.workbuddy-ai/
+data/lated_trans/
+data/dark_totaltext_test/
+data/dark_ctw1500_test/

@@ -42,9 +42,14 @@ class SpottingEvaluator:
         self.c_all = self.c["all"]
 
     def add(self, preds, gts, image_bin=None):
-        """preds: [{'poly','text','score'}]; gts: [{'poly','text','ignore'?,'bin'?}] in the SAME coordinate frame."""
+        """preds: [{'poly','text','score'}]; gts: [{'poly','text','ignore'?,'bin'?}] in the SAME coordinate frame.
+
+        ignore=true  : geometry don't-care (TotalText '#'); matched preds absorbed, no GT counting.
+        text '###'/'' with ignore=false: confirmed text without transcription (LATeD/CTW): counts for
+        detection only, never for e2e (mirrors the P0-13 training-side split)."""
         gp = [_poly(g["poly"]) for g in gts]
-        dont = [bool(g.get("ignore")) or g.get("text", "") in ("###", "") for g in gts]
+        dont = [bool(g.get("ignore")) for g in gts]
+        texted = [g.get("text", "") not in ("###", "") for g in gts]
         order = sorted(range(len(preds)), key=lambda i: -preds[i].get("score", 1.0))
         used, n_pred = set(), 0
         for i in order:
@@ -59,14 +64,18 @@ class SpottingEvaluator:
             if best >= self.thr and bj >= 0:
                 used.add(bj)
                 if dont[bj]:
-                    continue                                # absorbed by don't-care
+                    continue                                # absorbed by geometry don't-care
                 n_pred += 1
                 g = gts[bj]; key = g.get("bin") or image_bin or "unk"
-                ok = norm_text(preds[i]["text"]) == norm_text(g["text"])
-                ref = norm_text(g["text"])
                 for k in ("all", key):
-                    self.c[k]["tp_det"] += 1; self.c[k]["tp_e2e"] += ok
-                    self.c[k]["edits"] += edit_distance(norm_text(preds[i]["text"]), ref); self.c[k]["chars"] += max(len(ref), 1)
+                    self.c[k]["tp_det"] += 1                 # valid text geometry (transcribed or not)
+                if texted[bj]:
+                    ok = norm_text(preds[i]["text"]) == norm_text(g["text"])
+                    ref = norm_text(g["text"])
+                    for k in ("all", key):
+                        self.c[k]["tp_e2e"] += ok; self.c[k]["n_match_e2e"] += 1
+                        self.c[k]["edits"] += edit_distance(norm_text(preds[i]["text"]), ref)
+                        self.c[k]["chars"] += max(len(ref), 1)
             else:
                 n_pred += 1
         self.c_all["n_pred"] += n_pred
@@ -75,17 +84,22 @@ class SpottingEvaluator:
                 continue
             key = g.get("bin") or image_bin or "unk"
             for k in ("all", key):
-                self.c[k]["n_gt"] += 1
+                self.c[k]["n_gt"] += 1                      # detection denominator includes textless GT
                 if j not in used:
                     self.c[k]["missed"] += 1
+                if texted[j]:
+                    self.c[k]["n_gt_e2e"] += 1              # e2e denominator: transcribed GT only
 
     def summary(self):
         res = {}
         for k, c in self.c.items():
             n_gt, tp, e2e = c["n_gt"], c["tp_det"], c["tp_e2e"]
-            r = dict(n_gt=int(n_gt), det_recall=tp / max(n_gt, 1), e2e_recall=e2e / max(n_gt, 1),
-                     rec_acc_on_det=e2e / max(tp, 1), cer_on_det=c["edits"] / max(c["chars"], 1),
-                     frac_missed=c["missed"] / max(n_gt, 1), frac_misread=(tp - e2e) / max(n_gt, 1))
+            n_gt_e2e, n_match_e2e = c["n_gt_e2e"], c["n_match_e2e"]
+            r = dict(n_gt=int(n_gt), n_gt_e2e=int(n_gt_e2e),
+                     det_recall=tp / max(n_gt, 1), e2e_recall=e2e / max(n_gt_e2e, 1),
+                     rec_acc_on_det=e2e / max(n_match_e2e, 1),
+                     cer_on_det=c["edits"] / max(c["chars"], 1),
+                     frac_missed=c["missed"] / max(n_gt, 1), frac_misread=(n_match_e2e - e2e) / max(n_gt_e2e, 1))
             if k == "all":
                 npred = c["n_pred"]; p_det, p_e2e = tp / max(npred, 1), e2e / max(npred, 1)
                 r.update(det_P=p_det, det_R=r["det_recall"], det_F=2 * p_det * r["det_recall"] / max(p_det + r["det_recall"], 1e-9),

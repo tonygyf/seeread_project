@@ -7,6 +7,7 @@ pyyaml
 tqdm
 # recognizer (TrOCR + LoRA) -- optional, only for rec.type=trocr
 transformers>=4.40
+scipy>=1.10
 peft>=0.10
 # LaTeX table export / plotting
 pandas

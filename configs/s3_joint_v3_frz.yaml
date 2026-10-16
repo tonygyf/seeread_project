@@ -1,0 +1,25 @@
+# S3-v3 arm B: rec FROZEN (collaborator's original design). A/B pair with s3_joint_v3_ft.yaml.
+# Mixture: TotalText(main, transcribed) + ICDAR2015 train (transcribed, online darkened) +
+#          CTW1500 train (det-only, no transcripts) + SynthText replay (domain-balance / anti-forgetting).
+_base_: base.yaml
+data:
+  train_anns:
+    - data/annotations/totaltext_train_main.jsonl
+    - data/annotations/icdar2015_train.jsonl
+    - data/annotations/ctw1500_train_det.jsonl
+    - data/annotations/synthtext_train.jsonl
+  mix_weights: [1.0, 1.0, 0.5, 0.7]      # draw shares: TT 31% / ICDAR 31% / CTW 16% / SynthText 22%
+  mix_samples_per_epoch: 4000
+  val_ann: data/annotations/totaltext_val.jsonl
+train:
+  stage: joint
+  out_dir: results/v3_archive/s3_joint_v3_frz
+  epochs: 40
+  batch_size: 8
+  lr: 1.0e-4
+  amp: true
+  val_every: 2
+  seed: 0
+  freeze_rec: true
+  init_det: results/v2_archive/s15_det_lated_v2/last.pt
+  init_rec: results/v2_archive/s2_rec_v2/last.pt

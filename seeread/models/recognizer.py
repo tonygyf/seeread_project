@@ -44,6 +44,7 @@ class CRNNRecognizer(BaseRecognizer):
         self.cnn = nn.Sequential(blk(3, 64, (2, 2)), blk(64, 128, (2, 2)), blk(128, 256, (2, 1)), blk(256, 256, (2, 1)))
         self.rnn = nn.LSTM(256, hidden, num_layers=2, bidirectional=True, batch_first=True)
         self.fc = nn.Linear(2 * hidden, len(self.cs.chars) + 1)
+        self.n_skip = 0                                   # texts skipped for empty charset encoding (OOV)
 
     def _seq(self, crops):
         x = F.interpolate(crops, size=self.in_hw, mode="bilinear", align_corners=False)
@@ -53,11 +54,19 @@ class CRNNRecognizer(BaseRecognizer):
     def encode_features(self, crops): return self._seq(crops)
 
     def forward_loss(self, crops, texts):
+        enc = [self.cs.encode(t) for t in texts]
+        keep = [i for i, e in enumerate(enc) if e]        # empty encoding = OOV text: skip it, never a fake class id
+        prev, self.n_skip = self.n_skip, self.n_skip + len(enc) - len(keep)
+        if self.n_skip // 100 > prev // 100:
+            print(f"[CRNN] WARNING: {self.n_skip} texts skipped in total (empty charset encoding / OOV)")
+        if not keep:
+            return None
+        crops = crops[keep]
         logits = self.fc(self._seq(crops)).log_softmax(-1).transpose(0, 1)  # (T,N,C)
-        tg = [torch.tensor(self.cs.encode(t) or [1], dtype=torch.long) for t in texts]
+        tg = [torch.tensor(enc[i], dtype=torch.long) for i in keep]
         T, N = logits.shape[:2]
         return F.ctc_loss(logits, torch.cat(tg).to(crops.device), torch.full((N,), T, dtype=torch.long),
-                          torch.tensor([len(t) for t in tg]), zero_infinity=True)
+                          torch.tensor([len(enc[i]) for i in keep]), zero_infinity=True)
 
     @torch.no_grad()
     def predict(self, crops):
@@ -72,6 +81,12 @@ class TrOCRRecognizer(BaseRecognizer):
         self.base = VisionEncoderDecoderModel.from_pretrained(name)
         self.tok = TrOCRProcessor.from_pretrained(name).tokenizer
         self.max_len = max_len
+        # transformers>=5 no longer auto-propagates token ids onto the top-level config; without this,
+        # forward(labels=...) raises "AttributeError: no attribute pad_token_id".
+        start = getattr(self.tok, "cls_token_id", None) or getattr(self.tok, "bos_token_id", None)
+        self.base.config.decoder_start_token_id = start
+        self.base.config.pad_token_id = self.tok.pad_token_id
+        self.base.config.eos_token_id = self.tok.eos_token_id
         if freeze:
             for p in self.base.parameters(): p.requires_grad = False
         elif lora_r > 0:

@@ -1,0 +1,33 @@
+# S4-v4: recognizer swap CRNN -> TrOCR (LoRA), det FROZEN, enh trained from scratch on GT geometry.
+# Single-factor vs the v2/v3 rec baseline (CRNN ceiling = 13%/6% lit/dark measured by D1 A-path).
+# det stays the reference detector used by the attribution/D1 harness (s3_joint_v2) and is NOT trained here;
+# too_long/border geometry is fixed on the INFERENCE side (tsr_decode endpoint trim) + GT direction canonicalization.
+# Mix drops CTW (det-only, contributes nothing in the rec stage) so rec sees English transcripts only:
+#   TT main (real) + ICDAR2015 (lit -> online darkened) + SynthText (lit -> online darkened).
+_base_: base.yaml
+data:
+  train_anns:
+    - data/annotations/totaltext_train_main.jsonl
+    - data/annotations/icdar2015_train.jsonl
+    - data/annotations/synthtext_train.jsonl
+  mix_weights: [1.0, 1.0, 1.0]
+  mix_samples_per_epoch: 4000
+  val_ann: data/annotations/totaltext_val.jsonl
+rec:
+  type: trocr
+  name: microsoft/trocr-base-printed
+  lora_r: 16
+  lora_alpha: 32
+  freeze: false
+train:
+  stage: rec
+  out_dir: results/s4_rec_v4
+  epochs: 20
+  batch_size: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  amp: true
+  val_every: 2
+  seed: 0
+  init_det: results/v2_archive/s3_joint_v2/best.pt
+  init_rec: null

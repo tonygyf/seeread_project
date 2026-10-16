@@ -1,22 +1,14 @@
-# data/raw/ — 原始数据集下载占位（尚未下载，计划在服务器上获取）
+# data/raw — 原始官方数据集（未转换）
 
-官方原样数据放这里，只读不改；协议化 JSONL 转换结果写入 `data/annotations/`。
-JSONL 协议见 `docs/02_dataset_protocol.md`，研究设计见 `docs/01_research_design.md` §4。
+每个数据集独立子目录，统一由 `data/DATASETS.md` 记录来源、状态与大小。
+转换器（待补：docs/01 §6 状态说明"需要你补"）将其转为 `data/annotations/*.jsonl` 并按协议平铺到 `data/images`、`data/images_lit`。
 
-## 下载清单（子目录名为约定名）
-
-| 子目录 | 数据集 | 规模 | 获取方式 | 说明 |
-|---|---|---|---|---|
-| `lated/` | LATeD（Seeing 论文） | 1,500 图（train 1000 / test 500），line-level 多边形 | 论文官方发布；"code and dataset will be released"，**先向老师确认可用性与署名许可**（docs/01 §0.3） | **无转写**，LATeD-Spot 需补转写（13,923 实例，docs/03 P0-02） |
-| `synthtext/` | SynthText | ~80 万实例 | 官方发布 | 检测器预训练；`illum_kind=lit` 在线暗化，自带 CIC 亮配对 |
-| `mlt17/` | MLT17 | 官方 train | 官方（需注册） | 同上 |
-| `ctw1500/` | CTW1500 | test 200 图 | 官方 GitHub | 亮图基线评测 + Dark-CTW1500 合成源 |
-| `totaltext/` | Total-Text | test 300 图 | 官方 GitHub | 同上 |
-| `lstr/` | LSTR（Reading in the Dark） | 11,273 train / 6,588 test 裁剪 | 论文 HuggingFace 发布 | 识别器训练与对齐实验 |
-| `estr/` | ESTR（Reading 原版） | 60 裁剪 | 论文 HuggingFace 发布 | 仅识别测试 |
-
-## 注意
-
-- ESTR-v2 为**自采数据集**（非下载），图像与配对亮帧分别放 `data/images/` 与 `data/images_lit/`，采集规范见 `docs/02_dataset_protocol.md` §3。
-- 各数据集 → 协议 JSONL 的转换器目前缺失（docs/03 P0-11 / docs/01 §6 "需要你补"），落地后命令统一记录在 `data/annotations/README.md`。
-- 下载后核对许可：公开数据集引用原文；自采数据发布前做人脸/车牌模糊（docs/02 §3.5）。
+| 子目录 | 数据集 | 用途（docs/01 §4） | 获取方式 |
+|---|---|---|---|
+| LATeD/ | LATeD 1,500 张（暗图+亮图+多边形标注） | 主基准 LATeD-Spot（train 900/val 100/test 500） | 本地复制自 DarkText-private |
+| SynthText/ | SynthText 80万合成场景文本 | Dark-SynthText 在线暗化预训练源 | 容器下载 |
+| MLT17/ | ICDAR2017 MLT 多语种 | Dark-MLT17 在线暗化预训练源 | 容器下载 |
+| CTW1500/ | CTW1500 曲线文本 | Dark-CTW1500 固定种子三档合成暗化测试 + 检测协议 | 容器下载 |
+| TotalText/ | Total-Text 任意形状文本 | Dark-Total-Text 三档合成暗化测试 + E2E 不退化验证 | 容器下载 |
+| ICDAR2015/ | ICDAR2015 四点标注 | 亮光数据不退化验证 | 容器下载 |
+| ESTR/ | ESTR 60 裁剪（Reading 原版） | 与 Reading 对齐的识别测试 | 容器下载（HuggingFace） |

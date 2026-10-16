@@ -41,6 +41,33 @@ services:
       # - ./:/workspace
     # Enough shared memory for DataLoader workers (configs/base.yaml: data.workers)
     shm_size: "16g"
+    # --- Resource guards: a runaway/leaking run gets OOM-killed or capped
+    # inside the container instead of freezing the whole host ---
+    # tini as PID 1: reaps orphaned/zombie DataLoader worker processes
+    init: true
+    # Hard memory ceiling (default 128g ≈ 50% of this host's RAM, includes the
+    # 16g /dev/shm above); memswap_limit == mem_limit forbids extra swap, so the
+    # cgroup OOM-kills the container instead of dragging the host into swap
+    mem_limit: ${MEM_LIMIT:-128g}
+    memswap_limit: ${MEM_LIMIT:-128g}
+    # Cap tasks (processes+threads) to contain fork bombs; plenty for
+    # data.workers=4 with OMP_NUM_THREADS=8 (see .env)
+    pids_limit: 512
+    # Keep half the host cores free so the machine stays responsive
+    cpus: ${CPUS:-64}
+    ulimits:
+      core:
+        soft: 0              # no core dumps filling the disk on crashes
+        hard: 0
+      nofile:
+        soft: 65536
+        hard: 65536
+    # Bound container logs so long runs cannot fill the disk
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     # GPU passthrough — Docker Compose v2 + NVIDIA Container Toolkit
     deploy:
       resources:

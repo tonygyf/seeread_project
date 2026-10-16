@@ -87,7 +87,7 @@ def darken_physical(img_u8, rng, level="dark", blur_p=0.3, peak=(800.0, 4000.0),
 def darken(img_u8, rng=None, level=None, mode="physical", **kw):
     """img_u8: HxWx3 RGB uint8. Returns (dark_u8, meta). meta['illum_y'] / meta['illum_bin'] are filled."""
     rng = rng if rng is not None else np.random.default_rng()
-    level = level or rng.choice(list(PHYS_LEVELS))
+    level = level or rng.choice(["mild", "dark"])   # extreme dropped: exposure ratio 0.06% destroys text texture irreversibly
     fn = darken_physical if mode == "physical" else darken_legacy
     out, meta = fn(img_u8, rng, level, **kw)
     meta["illum_y"] = luminance(out.astype(np.float32) / 255.0)

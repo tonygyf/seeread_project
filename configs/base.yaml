@@ -25,6 +25,7 @@ loss:
   det: 1.0
   rec: 1.0
   enh: 0.1
+  enh_rec: 0.0                  # >0: L1 reconstruction loss between enhancer output and lit GT crop (strong enhancer supervision)
   cic: 0.5                    # 0 disables cross-illumination consistency (ablation)
 train:
   stage: joint                # det | rec | joint
@@ -39,3 +40,4 @@ train:
   resume: null
   init_det: null              # stage-1 detector checkpoint
   init_rec: null
+  val_every: 0                # >0: evaluate data.val_ann every N epochs and keep best.pt by bright-val e2e F1

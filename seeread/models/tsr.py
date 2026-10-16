@@ -24,8 +24,27 @@ def order_along_principal_axis(pts):
     return np.argsort(c @ ax)
 
 
+def _trim_ends(Pt, hs, conf, frac=0.7):
+    """Drop low-confidence endpoints of an ordered centerline caused by mask noise-bleed.
+
+    FPS picks points over the WHOLE connected component, so under dark noise (morphological closing +
+    component bleed) the two extreme points land past the true text ends -> the predicted centerline is
+    too_long (D1: 38%/74% of lit/dark B-failures).  Body pixels have text prob ~1 while the bleed tail
+    decays toward the detection threshold, so trimming ends below `frac * median` recovers the true extent.
+    Keeps >=2 points so the K<2 fix-up in SeeRead.infer never has to fire."""
+    if len(Pt) <= 2:
+        return Pt, hs
+    thr = frac * float(np.median(conf))
+    lo, hi = 0, len(Pt)
+    while lo < hi - 1 and conf[lo] < thr:
+        lo += 1
+    while hi > lo + 1 and conf[hi - 1] < thr:
+        hi -= 1
+    return Pt[lo:hi], hs[lo:hi]
+
+
 def tsr_decode(text_p, center_p, geo, stride=4, thr_center=0.5, thr_text=0.5, fixed_w=6.0,
-               step=3.0, min_area=8, k_max=32, close=5):
+               step=3.0, min_area=8, k_max=32, close=5, trim_frac=0.7):
     """text_p, center_p: HxW probs; geo: 3xHxW (log1p h, cos, sin) at feature res. Returns list of dicts in input px."""
     Hf, Wf = text_p.shape
     cmask = ((center_p > thr_center) & (text_p > thr_text)).astype(np.uint8)
@@ -61,7 +80,10 @@ def tsr_decode(text_p, center_p, geo, stride=4, thr_center=0.5, thr_text=0.5, fi
             continue
         poly = cv2.approxPolyDP(cnt, 0.01 * cv2.arcLength(cnt, True), True).reshape(-1, 2).astype(np.float32)
         order = order_along_principal_axis(P)
+        Po, hso = P[order], np.array(hs, np.float32)[order]
+        conf = text_p[Po[:, 1].astype(np.int32), Po[:, 0].astype(np.int32)]
+        Po, hso = _trim_ends(Po, hso, conf, trim_frac)
         m = np.zeros((Hf, Wf), np.uint8); cv2.fillPoly(m, [cnt], 1)
         res.append(dict(poly=poly * stride, score=float(text_p[m > 0].mean()),
-                        centers=P[order] * stride, heights=np.array(hs, np.float32)[order] * stride))
+                        centers=Po * stride, heights=hso * stride))
     return res

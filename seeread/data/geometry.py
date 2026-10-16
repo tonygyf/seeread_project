@@ -10,12 +10,24 @@ def canonical_quad(pts):
 
 
 def split_polygon(poly):
-    """CTW1500 convention: top side left->right, then bottom side right->left. Returns top, bottom both L->R."""
+    """CTW1500 convention: top side left->right, then bottom side right->left. Returns top, bottom both L->R.
+
+    Canonicalizes reading direction: some annotations trace the top side right->left (or bottom->top for
+    vertical text).  Without a fix this yields a 180deg-reversed centerline, injecting direction noise into the
+    det direction head AND producing upside-down recognition crops (measured at ~7% of TotalText GT)."""
     poly = np.asarray(poly, np.float32)
     if len(poly) < 4 or len(poly) % 2:
         poly = canonical_quad(poly)
     n = len(poly) // 2
-    return poly[:n], poly[n:][::-1].copy()
+    top, bot = poly[:n], poly[n:][::-1].copy()
+    if len(top) >= 2:
+        c = top - top.mean(0)
+        ax = np.linalg.svd(c, full_matrices=False)[2][0]
+        if (abs(ax[0]) >= abs(ax[1]) and ax[0] < 0) or (abs(ax[0]) < abs(ax[1]) and ax[1] < 0):
+            ax = -ax                                   # canonical reading axis: +x (horizontal) / +y (vertical)
+        if float((top[-1] - top[0]) @ ax) < 0:          # polygon traced against reading order -> flip both halves
+            top, bot = top[::-1].copy(), bot[::-1].copy()
+    return top, bot
 
 
 def resample_polyline(pts, k):

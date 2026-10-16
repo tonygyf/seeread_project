@@ -4,7 +4,7 @@
   (3) a train-only cross-illumination consistency loss (dark crop features ~ lit crop features)."""
 from __future__ import annotations
 import random
-import numpy as np, torch, torch.nn as nn
+import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 from .detector import SeeReadDetector
 from .enhancer import IlluminationAwareEnhancer, enhancer_regulariser
 from .recognizer import BaseRecognizer
@@ -28,39 +28,47 @@ class SeeRead(nn.Module):
         dev = next(self.parameters()).device
         img = batch["image"].to(dev); gt = {k: v.to(dev) for k, v in batch["targets"].items()}
         lit = batch.get("lit"); lit = lit.to(dev) if lit is not None else None
+        lit_mask = batch.get("lit_mask")          # per-sample pairing flag: CIC only counts paired samples
         stage = c.train.stage
         losses = {}
         with torch.set_grad_enabled(stage in ("det", "joint")):
             out = self.det(img, with_scm=(stage != "rec" and c.model.use_scm))
             if stage != "rec":
                 for k, v in detection_loss(out, gt).items():
-                    losses[f"det_{k}"] = v * (w.det if k not in ("sr", "ss") else 1.0)
+                    losses[f"det_{k}"] = v * w.det   # sr/ss inside lambda_det, per L = λ_det*(seg+H+dir+sr+ss) in docs/01 §3
         if stage == "det":
             return losses
         ctx = self.det.illum_context(img, out["c5"])
-        crops, crops_lit, texts, ctxs = [], [], [], []
+        crops, crops_lit, texts, ctxs, idx_paired = [], [], [], [], []
         for b, inss in enumerate(batch["instances"]):
             for ins in inss:
                 cen = torch.from_numpy(ins["centers"]).to(dev); hg = torch.from_numpy(ins["heights"]).to(dev)
-                if random.random() < pred_geom_prob:       # curriculum: GT height -> predicted height
+                if stage == "joint" and random.random() < pred_geom_prob:   # curriculum: GT -> predicted heights, joint stage only (rec trains on GT geometry)
                     hp = torch.expm1(sample_map(out["geo"][b:b + 1, :1], cen, self.stride)[:, 0].clamp(min=0)) * self.stride
                     hg_use = hp
                 else:
                     hg_use = hg
                 crops.append(rectify_strip(img[b:b + 1], cen, hg_use, self.crop_hw))
-                if lit is not None:
+                if lit is not None and bool(lit_mask[b]):
                     crops_lit.append(rectify_strip(lit[b:b + 1], cen, hg, self.crop_hw))
+                    idx_paired.append(len(crops) - 1)
                 texts.append(ins["text"]); ctxs.append(ctx[b:b + 1])
         if not crops:
             return losses
         x = torch.cat(crops); z = torch.cat(ctxs)
         y, prm = self.enh(x, z)
-        losses["rec"] = w.rec * self.rec.forward_loss(y, texts)
+        l_rec = self.rec.forward_loss(y, texts)
+        if l_rec is not None:                     # all-OOV texts: no rec loss this batch instead of fake targets
+            losses["rec"] = w.rec * l_rec
         losses["enh"] = w.enh * enhancer_regulariser(x, y, prm)
+        if crops_lit and getattr(w, "enh_rec", 0.0) > 0:
+            lit_cat = torch.cat(crops_lit)
+            losses["enh_rec"] = w.enh_rec * F.l1_loss(y[torch.tensor(idx_paired, device=y.device)], lit_cat)
         if crops_lit and w.cic > 0:
             with torch.no_grad():
                 f_lit = self.rec.encode_features(torch.cat(crops_lit))
-            losses["cic"] = w.cic * cic_loss(self.rec.encode_features(y), f_lit)
+            f_dark = self.rec.encode_features(y[torch.tensor(idx_paired, device=y.device)])   # paired crops only
+            losses["cic"] = w.cic * cic_loss(f_dark, f_lit)
         return losses
 
     # ------------------------------------------------------------------ inference
