@@ -4,9 +4,9 @@
 # Commands (images are only pulled/built when you explicitly run these):
 #   docker compose build
 #   docker compose run --rm seeread python tests/test_smoke.py
-#   docker compose run --rm seeread python tools/train.py --config configs/seeread_joint.yaml
-#   docker compose run --rm seeread python tools/eval.py \
-#       --config configs/seeread_joint.yaml --ckpt results/run/last.pt \
+#   docker compose run --rm seeread python tools/legacy/train.py --config configs/legacy/seeread_joint.yaml
+#   docker compose run --rm seeread python tools/legacy/eval.py \
+#       --config configs/legacy/seeread_joint.yaml --ckpt results/run/last.pt \
 #       --ann data/annotations/latedspot_test.jsonl --out results/run/test.json
 # On a CPU-only host, remove the `deploy.resources` reservation block below.
 
@@ -31,7 +31,7 @@ services:
     volumes:
       # Datasets and frozen jsonl annotations (see docs/02_dataset_protocol.md)
       - ./data:/workspace/data
-      # Checkpoints and metric outputs from tools/train.py / tools/eval.py
+      # Checkpoints and metric outputs from tools/legacy/train.py / tools/legacy/eval.py
       - ./results:/workspace/results
       # Cached pretrained weights (TrOCR, ResNet50 backbone) between containers
       - hf-cache:/home/appuser/.cache/huggingface

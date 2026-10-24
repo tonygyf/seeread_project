@@ -1,0 +1,40 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Healthy current SynthText snapshot full CTW/LATeD dev only, unchanged model sources before numeric repair; no test selection.",
+  "jobs": [
+    {
+      "id": "SynthText_latest_ctw_dev",
+      "argv": [
+        "python",
+        "tools/v5_eval_detection.py",
+        "--checkpoint",
+        "results/v5/diagnostics/detection_stage_20261023/checkpoint.pt",
+        "--config",
+        "configs/v5/seeing_synthtext_classification_fp32.yaml",
+        "--output",
+        "results/v5/diagnostics/detection_stage_20261023/ctw_dev"
+      ],
+      "report": "results/v5/diagnostics/detection_stage_20261023/ctw_dev/run.json",
+      "log": "results/v5/diagnostics/detection_stage_20261023/ctw_dev.log",
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "SynthText_latest_lated_dev",
+      "argv": [
+        "python",
+        "tools/v5_eval_detection.py",
+        "--checkpoint",
+        "results/v5/diagnostics/detection_stage_20261023/checkpoint.pt",
+        "--config",
+        "configs/v5/seeing_lated_classification_fp32.yaml",
+        "--output",
+        "results/v5/diagnostics/detection_stage_20261023/lated_dev"
+      ],
+      "report": "results/v5/diagnostics/detection_stage_20261023/lated_dev/run.json",
+      "log": "results/v5/diagnostics/detection_stage_20261023/lated_dev.log",
+      "timeout_seconds": 1200
+    }
+  ]
+}

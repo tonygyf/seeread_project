@@ -1,0 +1,4 @@
+stages:
+  - seeing_synthtext_paper_aug.yaml
+  - seeing_mlt17.yaml
+  - seeing_lated.yaml

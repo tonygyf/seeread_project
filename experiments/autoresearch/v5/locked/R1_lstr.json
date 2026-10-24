@@ -1,0 +1,89 @@
+{
+  "format": "seeread_v5_locked_lstr_test_v1",
+  "baseline": "R1_public_selfdace_frozen",
+  "config": {
+    "experiment": {
+      "id": "R1",
+      "version": 5,
+      "role": "official Self-DACE stage2 plus frozen TrOCR; Reading checkpoint unspecified"
+    },
+    "recognizer": {
+      "type": "trocr",
+      "name": "microsoft/trocr-base-printed",
+      "revision": "93450be3f1ed40a930690d951ef3932687cc1892",
+      "local_files_only": true,
+      "adapter": "none",
+      "trainability": "frozen",
+      "max_len": 64
+    },
+    "enhancer": {
+      "type": "srdace",
+      "source_root": "/opt/self-dace",
+      "stage": 2,
+      "freeze": true,
+      "clamp_output": true
+    },
+    "data": {
+      "root": "data",
+      "train_manifest": "data/annotations/v5/reading/train.jsonl",
+      "dev_manifest": "data/annotations/v5/reading/dev.jsonl",
+      "input_hw": [
+        384,
+        384
+      ],
+      "verify_hashes": true
+    },
+    "train": {
+      "out_dir": "results/v5/reading/R1_srdace_frozen",
+      "batch_size": 8,
+      "seed": 0,
+      "memory_fraction": 0.35,
+      "max_steps": 0,
+      "max_seconds": 1200,
+      "eval_every": 100,
+      "eval_initial": true,
+      "lr": 2e-05,
+      "weight_decay": 0.0001,
+      "amp": true,
+      "max_amp_skips": 16
+    },
+    "evaluation": {
+      "normalization": "raw",
+      "selection_metric": "raw_cer"
+    }
+  },
+  "config_source": "configs/v5/reading_srdace_frozen.yaml",
+  "config_sha256": "9ea59333456aac1c3c99401d36d83fffe0d44f42e4842277d576447359ae4a00",
+  "test_manifest": "data/annotations/v5/reading/test.jsonl",
+  "test_manifest_sha256": "5e9ee412513b0d9ac17185550e04df1e8013d4242c3ce6c2aca3739aa8218197",
+  "checkpoint": null,
+  "checkpoint_sha256": null,
+  "output": "results/v5/final/R1_LSTR",
+  "source_hashes": {
+    "tools/v5_reading.py": "e02421781aec31b2b112eab19b7632c3fc8e03ba2a13e2156aee19f2e0bea0bb",
+    "seeread/config.py": "496fc5005b824305c0562f84167c238f11aa7c53a5519f9421c59baa6d316660",
+    "seeread/models/recognizer.py": "3c61fb219aa939a51fbf345e16f820d81a8e4ec32c1daac19c4193fc2998e19d",
+    "seeread/metrics/spotting.py": "60c40ce508360c33eeeaf887a2599fc771240174b17e222ae22edb28e10f1657",
+    "seeread/v5/__init__.py": "c984c4e7a267074c9255c3d0fbf62c6476cb9e1be731be60c92fa584f9ac9974",
+    "seeread/v5/enhancers.py": "5d979b097ae75dad293cb1e4e304d2be5f4c679a4baa4441de06f10d31ec2fea",
+    "seeread/v5/reading.py": "9cc18e7cdf26d0b6551767b6067486f7f40f4385f1577b967f955f5c71e5981d",
+    "seeread/v5/recognition.py": "9411ec0dfb8c5925b3308f78dfeba4ffacfb49b9d63f98444b132ff2550598fb",
+    "seeread/v5/reading_objective.py": "63536b8a58b4585112caa7b879b19e84acd5260ea5edaab466a202dc019c136d",
+    "seeread/v5/training_safety.py": "783be2d6da87119a3064264fdfccd54ff90829dbc503478f3023be22a20dc975",
+    "tools/v5_final_reading.py": "122cee18df651844c05a34899b1e07632b86a4a62a502eb298a6474c53cb7d5e"
+  },
+  "runtime": {
+    "torch": "2.7.1+cu128",
+    "cuda": "12.8",
+    "deterministic_algorithms": false,
+    "cudnn_deterministic": false,
+    "cudnn_benchmark": false,
+    "transformers": "5.19.0",
+    "peft": "0.21.2",
+    "numpy": "2.2.6",
+    "opencv-python": null
+  },
+  "selection": "locked before test; subsequent method selection uses dev only",
+  "real_test_policy": "ESTR60 deferred until the final project method is locked",
+  "protocol_sha256": "4ba7c355234ea1497cc42d813918bf79c6dcb1c4ae6f7f1f6999de0517e0d923"
+}

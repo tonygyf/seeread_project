@@ -1,0 +1,10 @@
+experiment	status	dev_raw_cer	dev_lower_alnum_cer	dev_word_accuracy_raw	samples	decision	report
+R0	complete	1.0589455488331894	0.8834865629420084	0.07897071872227152	1127	reference	results/v5/reading/R0_frozen/run.json
+R1	complete	0.779256698357822	0.5981258840169731	0.1481810115350488	1127	keep_for_controlled_training	results/v5/reading/R1_srdace_frozen/run.json
+R2	complete	0.5656006914433881	0.49929278642149927	0.2963620230700976	1127	diagnostic_only; train0_generate2_mismatch	results/v5/reading/R2_lora_short/run.json
+R2b	complete	0.556266205704408	0.49734794908062235	0.30168589174800353	1127	keep_corrected_for_long_training	results/v5/reading/R2b_lora_short/run.json
+R4	failed	0.4751944684528954	0.4372347949080622	0.3611357586512866	1127	keep_best_dev_step24000; stop_debug_cumulative_amp_budget; not_official_test	results/v5/reading/R4_paper_joint_short/run.json
+R4b	complete	0.4784788245462403	0.4414780763790665	0.35758651286601595	1127	best_complete_dev_step19400; locked_LSTR_test_raw_CER_0.5492485515131907; not_paper_accepted	results/v5/reading/R4b_amp_safe/run.json
+R0str	complete	0.5375972342264477	0.42132248939179634	0.3593611357586513	1127	locked_LSTR_test_complete; test_raw_CER_0.5357783594600158; test_word_accuracy_0.3787188828172435; future_selection_dev_only	results/v5/reading/R0str_frozen/run.json
+R2str	complete	0.3996542783059637	0.36633663366336633	0.4614019520851819	1127	locked_LSTR_test_complete; test_raw_CER_0.49489720890562044; test_word_accuracy_0.40209471766848814; future_selection_dev_only	results/v5/reading/R2str_lora/run.json
+R4str	complete	0.39775280898876403	0.36103253182461104	0.4587400177462289	1127	locked_LSTR_test_complete; test_raw_CER_0.4951913179024146; test_word_accuracy_0.403157255616272; future_selection_dev_only	results/v5/reading/R4str_joint/run.json

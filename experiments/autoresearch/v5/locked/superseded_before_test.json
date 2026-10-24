@@ -1,0 +1,12 @@
+{
+  "superseded_protocols": [
+    "R0_lstr.json",
+    "R1_lstr.json"
+  ],
+  "replacement": [
+    "R0_lstr_v2.json",
+    "R1_lstr_v2.json"
+  ],
+  "reason": "pre-evaluation lock hardening: official verified test digest and external public-source/weights digests",
+  "official_test_predictions_generated_under_superseded_protocols": false
+}

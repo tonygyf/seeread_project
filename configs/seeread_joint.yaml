@@ -1,2 +1,0 @@
-_base_: base.yaml
-train: {stage: joint, out_dir: results/seeread_joint}

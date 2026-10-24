@@ -127,7 +127,7 @@ def test_p011_synth_dark_recomputes_instance_bin():
         row = dict(image="images/a.png", instances=[dict(poly=[[15, 45], [120, 45], [120, 90], [15, 90]], text="stop", bin="lit")], meta={})
         src = os.path.join(d, "src.jsonl"); open(src, "w").write(json.dumps(row))
         out = os.path.join(d, "out")
-        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "make_synth_dark.py"), "--ann", src, "--root", d, "--out", out, "--seed", "1234"], check=True)
+        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "data", "make_synth_dark.py"), "--ann", src, "--root", d, "--out", out, "--seed", "1234"], check=True)
         rows = [json.loads(l) for l in open(os.path.join(out, "ann.jsonl"), encoding="utf-8")]
         assert len(rows) == len(PHYS_LEVELS)
         for r in rows:
@@ -157,7 +157,7 @@ def test_p012_lit_image_untouched_at_eval():
 
 
 def test_p101_p104_rec_stage_skip_and_frozen_bn():
-    from tools.train import set_frozen_eval
+    from tools.legacy.train import set_frozen_eval
     m = SeeRead(CRNNRecognizer(), _cfg(stage="rec")); m.train(); set_frozen_eval(m, "rec")
     assert not m.det.training and m.enh.training and m.rec.training
     bn = next(mod for mod in m.det.modules() if isinstance(mod, torch.nn.BatchNorm2d))
@@ -178,10 +178,12 @@ def test_p101_p104_rec_stage_skip_and_frozen_bn():
                      train=dict(stage="rec", epochs=1, batch_size=2, lr=1e-4, weight_decay=1e-4, pred_geom_warmup=0.5,
                                 amp=False, seed=0, out_dir=os.path.join(d, "out"), resume=None, init_det=None, init_rec=None))
         cfg_p = os.path.join(d, "mini.yaml"); open(cfg_p, "w").write(yaml.safe_dump(cfg_d))
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "train.py"), "--config", cfg_p],
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "legacy", "train.py"), "--config", cfg_p],
                            capture_output=True, text=True, env=dict(os.environ, CUDA_VISIBLE_DEVICES=""), cwd=ROOT)
         assert r.returncode == 0, r.stderr[-2000:]
-        assert r.stdout.count("SKIP") == 2 and "2 batches skipped" in r.stdout
+        saved = torch.load(os.path.join(d, "out", "last.pt"), map_location="cpu", weights_only=False)
+        assert saved["state"]["empty_skips"] == 2
+        assert saved["state"]["global_step"] == 0
         assert os.path.exists(os.path.join(d, "out", "last.pt"))
 
 
@@ -249,12 +251,17 @@ def test_val_hook_saves_best_pt():
                                 amp=False, seed=0, out_dir=os.path.join(d, "out"), resume=None,
                                 init_det=None, init_rec=None, val_every=1))
         cfg_p = os.path.join(d, "mini.yaml"); open(cfg_p, "w").write(yaml.safe_dump(cfg_d))
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "train.py"), "--config", cfg_p],
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "legacy", "train.py"), "--config", cfg_p],
                            capture_output=True, text=True, env=dict(os.environ, CUDA_VISIBLE_DEVICES=""), cwd=ROOT)
         assert r.returncode == 0, r.stderr[-2000:]
-        assert r.stdout.count("e2e_F=") == 2 and "new best" in r.stdout        # 2 eval points, best.pt tracked
+        assert r.stdout.count("e2e_F=") == 2
         assert os.path.exists(os.path.join(d, "out", "last.pt"))
         assert os.path.exists(os.path.join(d, "out", "best.pt"))                # peak-epoch checkpoint exists
+        best = torch.load(os.path.join(d, "out", "best.pt"), map_location="cpu", weights_only=False)
+        events = [json.loads(line) for line in open(os.path.join(d, "out", "train_events.jsonl"))]
+        scores = [event["e2e_F"] for event in events
+                  if event["event"] == "validation" and not event["partial"]]
+        assert len(scores) == 2 and best["state"]["best_f1"] == max(scores)
 
 
 def test_p014_eval_semantics_split():
@@ -298,7 +305,7 @@ def test_p014_ignore_true_opt_out_of_det_training():
 
 def test_p015_estr_crop_contract():
     """ESTRCrops yields (dark, lit, label) with matched 3x64x256 tensors and drops un-transcriptable rows."""
-    from tools.train_s25 import ESTRCrops, CROP_HW
+    from tools.legacy.train_s25 import ESTRCrops, CROP_HW
     with tempfile.TemporaryDirectory() as d:
         for sub in ("low_light_train", "well_lit_train"):
             os.makedirs(os.path.join(d, sub))
@@ -346,7 +353,7 @@ def test_p015_s25_mixed_replay_runs():
                                 init_det=None, init_rec=None, val_every=0))
         cfg_p = os.path.join(d, "mini.yaml"); open(cfg_p, "w").write(yaml.safe_dump(cfg_d))
         out = os.path.join(d, "s25")
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "train_s25.py"), "--config", cfg_p,
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "legacy", "train_s25.py"), "--config", cfg_p,
                             "--out", out, "--steps", "2", "--bs", "4", "--estr-frac", "0.5",
                             "--img-bs", "2", "--estr-workers", "0", "--estr-root", er],
                            capture_output=True, text=True, env=dict(os.environ, CUDA_VISIBLE_DEVICES=""), cwd=ROOT)

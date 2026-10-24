@@ -1,0 +1,59 @@
+experiment:
+  id: R4_preflight
+  version: 5
+  role: five-update GPU numeric contract; not a trained baseline
+recognizer:
+  type: trocr
+  name: microsoft/trocr-base-printed
+  revision: 93450be3f1ed40a930690d951ef3932687cc1892
+  local_files_only: true
+  adapter: lora
+  trainability: lora
+  max_len: 64
+  lora_r: 16
+  lora_alpha: 32
+  lora_targets:
+  - query
+  - value
+  - q_proj
+  - v_proj
+  lora_dropout: 0.05
+enhancer:
+  type: srdace
+  source_root: /opt/self-dace
+  stage: 2
+  freeze: false
+  clamp_output: true
+data:
+  root: data
+  train_manifest: data/annotations/v5/reading/train.jsonl
+  dev_manifest: data/annotations/v5/reading/dev.jsonl
+  input_hw:
+  - 384
+  - 384
+  verify_hashes: true
+train:
+  out_dir: results/v5/reading/R4_gpu_preflight
+  batch_size: 4
+  seed: 0
+  memory_fraction: 0.35
+  max_steps: 5
+  max_seconds: 180
+  eval_every: 5
+  eval_initial: false
+  lr: 2.0e-05
+  weight_decay: 0.0001
+  amp: true
+  max_amp_skips: 24
+evaluation:
+  normalization: raw
+  selection_metric: raw_cer
+objective:
+  type: reading_joint
+  edge_weight: 100000.0
+  ocr_weight: 100.0
+  local_weight: 1000.0
+  global_weight: 1500.0
+  brightness_weight: 5.0
+  alpha_weight: 1000.0
+  beta_weight: 5000.0

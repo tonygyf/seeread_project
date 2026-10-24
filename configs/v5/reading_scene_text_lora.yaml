@@ -1,0 +1,9 @@
+_base_: reading_lora_corrected_short.yaml
+experiment:
+  id: R2str
+  role: independent public scene-text LoRA; paired with R4str; author checkpoint unknown
+recognizer:
+  name: microsoft/trocr-base-str
+  revision: 26c151f56a7983e2cfcf05d55dc14f2f5f70ce64
+train:
+  out_dir: results/v5/reading/R2str_lora

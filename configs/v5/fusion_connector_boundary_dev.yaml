@@ -1,0 +1,7 @@
+_base_: fusion_placement_dev.yaml
+experiment:
+  id: C1_connector_boundary_dev
+  role: same frozen weights and detections as C0; change only polygon crop sampling
+crop:
+  sampling: polygon_boundary
+output: results/v5/fusion/C1_connector_boundary_dev

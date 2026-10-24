@@ -1,0 +1,29 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Resume from healthy SynthText32800 after explicit text-head FP32 numerical migration; center_head already FP32. Architecture/loss/data unchanged, all training state preserved. Full SynthText2 -> MLT100 -> LATeD250 budgets. Same resource caps; no ESTR/test inference.",
+  "jobs": [
+    {
+      "id": "Seeing_classification_fp32_full_chain_LATeD",
+      "argv": [
+        "python",
+        "tools/v5_train_detection.py",
+        "--pipeline",
+        "configs/v5/seeing_pipeline_lated_classification_fp32.yaml",
+        "--resume",
+        "results/v5/detection/SynthText_classification_fp32_20261022/last.pt"
+      ],
+      "report": "results/v5/detection/LATeD_classification_fp32/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261022_Seeing_classification_fp32_full_chain.log",
+      "timeout_seconds": 604800
+    }
+  ]
+}

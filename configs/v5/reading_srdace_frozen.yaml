@@ -1,0 +1,42 @@
+experiment:
+  id: R1
+  version: 5
+  role: official Self-DACE stage2 plus frozen TrOCR; Reading checkpoint unspecified
+recognizer:
+  type: trocr
+  name: microsoft/trocr-base-printed
+  revision: 93450be3f1ed40a930690d951ef3932687cc1892
+  local_files_only: true
+  adapter: none
+  trainability: frozen
+  max_len: 64
+enhancer:
+  type: srdace
+  source_root: /opt/self-dace
+  stage: 2
+  freeze: true
+  clamp_output: true
+data:
+  root: data
+  train_manifest: data/annotations/v5/reading/train.jsonl
+  dev_manifest: data/annotations/v5/reading/dev.jsonl
+  input_hw:
+  - 384
+  - 384
+  verify_hashes: true
+train:
+  out_dir: results/v5/reading/R1_srdace_frozen
+  batch_size: 8
+  seed: 0
+  memory_fraction: 0.35
+  max_steps: 0
+  max_seconds: 1200
+  eval_every: 100
+  eval_initial: true
+  lr: 2.0e-05
+  weight_decay: 0.0001
+  amp: true
+  max_amp_skips: 16
+evaluation:
+  normalization: raw
+  selection_metric: raw_cer

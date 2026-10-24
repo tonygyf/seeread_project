@@ -11,7 +11,7 @@ import json, os
 import numpy as np, cv2, torch
 from torch.utils.data import Dataset
 from .geometry import make_det_targets, centerline_and_height
-from .lowlight_synth import darken
+from .lowlight_synth import darken, illum_bin, luminance
 
 cv2.setNumThreads(1)          # cap OpenCV TBB pools (each DataLoader worker inherits this); keeps PID/thread budget bounded
 
@@ -25,12 +25,15 @@ def _read_rgb(path):
 
 class SeeReadDataset(Dataset):
     def __init__(self, root, ann_file, train=True, size=640, synth_mode="physical",
-                 max_instances=16, rec_k=7, seed=0, min_text_h=4):
+                 max_instances=16, rec_k=7, seed=0, min_text_h=4, eval_condition="original"):
         self.root, self.train, self.size = root, train, size
         self.synth_mode, self.max_inst, self.rec_k, self.min_h = synth_mode, max_instances, rec_k, min_text_h
         with open(ann_file, encoding="utf-8") as f:
             self.items = [json.loads(l) for l in f if l.strip()]
         self.seed = seed
+        if eval_condition not in ("original", "dark"):
+            raise ValueError("eval_condition must be original or dark")
+        self.eval_condition = eval_condition
 
     def __len__(self):
         return len(self.items)
@@ -63,13 +66,26 @@ class SeeReadDataset(Dataset):
         img = _read_rgb(os.path.join(self.root, it["image"]))
         meta = dict(it.get("meta", {}))
         lit = None
-        if meta.get("illum_kind") == "lit" and self.train:   # online darkening (train only); eval keeps the lit image as-is
+        synth_eval = not self.train and self.eval_condition == "dark" and meta.get("illum_kind") == "lit"
+        if meta.get("illum_kind") == "lit" and (self.train or synth_eval):
             lit = img
             img, m = darken(lit, rng, mode=self.synth_mode)
             meta.update(m)
+            if synth_eval:
+                meta["eval_condition"] = "fixed_synthetic_dark"
         elif it.get("lit"):                          # real paired capture
             lit = _read_rgb(os.path.join(self.root, it["lit"]))
         H, W = img.shape[:2]
+        gt_orig = it["instances"]
+        if synth_eval:
+            gt_orig = []
+            for ins in it["instances"]:
+                poly = np.asarray(ins["poly"])
+                lo = np.maximum(np.floor(poly.min(0)).astype(int), 0)
+                hi = np.minimum(np.ceil(poly.max(0)).astype(int) + 1, [W, H])
+                patch = img[lo[1]:hi[1], lo[0]:hi[0]]
+                tag = illum_bin(luminance(patch.astype(np.float32) / 255)) if patch.size else meta["illum_bin"]
+                gt_orig.append(dict(ins, bin=tag))
         p = self._params(H, W, rng)
         s, nh, nw, ox, oy = p
         img_t = self._apply(img, p)
@@ -86,7 +102,8 @@ class SeeReadDataset(Dataset):
             # "###"/"" with ignore=false is a positive det target but excluded from rec (P0-13/P0-14 split).
             inst_det.append(dict(poly=poly, ignore=(not inside) or bool(ins.get("ignore"))))
             textless = bool(ins.get("ignore")) or ins.get("text", "") in ("###", "")
-            if not textless:
+            # A partial word cannot be supervised with its full transcription.
+            if not textless and inside:
                 c, hh = centerline_and_height(poly, self.rec_k)
                 if hh.mean() >= self.min_h:
                     inst_rec.append(dict(centers=c.astype(np.float32), heights=hh.astype(np.float32), text=ins["text"]))
@@ -95,7 +112,7 @@ class SeeReadDataset(Dataset):
                    targets={k: torch.from_numpy(v) for k, v in tg.items()},
                    instances=inst_rec[: self.max_inst], meta=meta, index=i,
                    scale=s, offset=(ox, oy), orig_size=(H, W),
-                   gt_orig=it["instances"])
+                   gt_orig=gt_orig)
         if lit_t is not None:
             out["lit"] = torch.from_numpy(lit_t).permute(2, 0, 1).float() / 255.0
         return out

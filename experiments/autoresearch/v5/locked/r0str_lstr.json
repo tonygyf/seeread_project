@@ -1,0 +1,100 @@
+{
+  "format": "seeread_v5_locked_lstr_test_v1",
+  "baseline": "R0str_public_scene_text",
+  "config": {
+    "experiment": {
+      "id": "R0str",
+      "version": 5,
+      "role": "public scene-text checkpoint control; author checkpoint unknown; development only"
+    },
+    "recognizer": {
+      "type": "trocr",
+      "name": "microsoft/trocr-base-str",
+      "revision": "26c151f56a7983e2cfcf05d55dc14f2f5f70ce64",
+      "local_files_only": true,
+      "adapter": "none",
+      "trainability": "frozen",
+      "max_len": 64
+    },
+    "enhancer": {
+      "type": "identity"
+    },
+    "data": {
+      "root": "data",
+      "train_manifest": "data/annotations/v5/reading/train.jsonl",
+      "dev_manifest": "data/annotations/v5/reading/dev.jsonl",
+      "input_hw": [
+        384,
+        384
+      ],
+      "verify_hashes": true
+    },
+    "train": {
+      "out_dir": "results/v5/reading/R0str_frozen",
+      "batch_size": 8,
+      "seed": 0,
+      "memory_fraction": 0.35,
+      "max_steps": 0,
+      "max_seconds": 1200,
+      "eval_every": 100,
+      "eval_initial": true,
+      "lr": 2e-05,
+      "weight_decay": 0.0001,
+      "amp": true,
+      "max_amp_skips": 16
+    },
+    "evaluation": {
+      "normalization": "raw",
+      "selection_metric": "raw_cer"
+    }
+  },
+  "config_source": "configs/v5/reading_scene_text_frozen.yaml",
+  "config_sha256": "372b8e71dc0475b93417ea5c5d2538fe6c653495eb9acaae6029b99be778d61e",
+  "test_manifest": "data/annotations/v5/reading/test.jsonl",
+  "test_manifest_sha256": "5e9ee412513b0d9ac17185550e04df1e8013d4242c3ce6c2aca3739aa8218197",
+  "checkpoint": null,
+  "checkpoint_sha256": null,
+  "output": "results/v5/final/R0str_LSTR",
+  "source_hashes": {
+    "tools/v5_reading.py": "333150f1be297ef870f654078d3937e13585021af06fffdd392dbc9bbb5fab82",
+    "seeread/config.py": "496fc5005b824305c0562f84167c238f11aa7c53a5519f9421c59baa6d316660",
+    "seeread/models/recognizer.py": "3c61fb219aa939a51fbf345e16f820d81a8e4ec32c1daac19c4193fc2998e19d",
+    "seeread/metrics/spotting.py": "60c40ce508360c33eeeaf887a2599fc771240174b17e222ae22edb28e10f1657",
+    "seeread/v5/__init__.py": "c984c4e7a267074c9255c3d0fbf62c6476cb9e1be731be60c92fa584f9ac9974",
+    "seeread/v5/enhancers.py": "5d979b097ae75dad293cb1e4e304d2be5f4c679a4baa4441de06f10d31ec2fea",
+    "seeread/v5/reading.py": "9cc18e7cdf26d0b6551767b6067486f7f40f4385f1577b967f955f5c71e5981d",
+    "seeread/v5/recognition.py": "9411ec0dfb8c5925b3308f78dfeba4ffacfb49b9d63f98444b132ff2550598fb",
+    "seeread/v5/reading_objective.py": "63536b8a58b4585112caa7b879b19e84acd5260ea5edaab466a202dc019c136d",
+    "seeread/v5/training_safety.py": "1039545e8da560d0f283d0d143dafcda4eff1f66e62e5e5da394c24f3de592a9",
+    "tools/v5_final_reading.py": "fa03ee2776c657fa4593db3c8219ab9033b383804a2e8740a301a9546dc61689"
+  },
+  "runtime": {
+    "torch": "2.7.1+cu128",
+    "cuda": "12.8",
+    "cuda_allocator_config": "expandable_segments:True",
+    "deterministic_algorithms": false,
+    "cudnn_deterministic": false,
+    "cudnn_benchmark": false,
+    "transformers": "5.19.0",
+    "peft": "0.21.2",
+    "numpy": "2.2.6",
+    "opencv-python": null
+  },
+  "data_provenance_sha256": "c43939e16566ef24bbda0d9dd72e920c4abcdc7b03ab618f8dd7a77216cf3c6a",
+  "external_artifacts": {
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/.gitattributes": "73c6c7bb48c33639bb0c9fce7456b8f9cf8a65ea9777bd5de54d37f109953bd1",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/README.md": "5094d19c2be87b6e30a153bc592abff5113207bca8fa3a7aa9a5f4e6b52d8409",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/config.json": "188d6e39486adb69aecdccb215471bb26e932d40f6bbfec834a87f65a979f46f",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/generation_config.json": "41149cdcffec4d657f32dfcddd9b208037f01286c9e07945c724908c58ed0193",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/merges.txt": "fe36cab26d4f4421ed725e10a2e9ddb7f799449c603a96e7f29b5a3c82a95862",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/preprocessor_config.json": "4b0995a0f2b7efac38f3e75a81b9dc7a485e49b9b26efbf2de9cdced0b9b0fa5",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/pytorch_model.bin": "eaff179cd469b751f3afa999ca3ed0ab178373e8b46ad060342cabd8cc277085",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/special_tokens_map.json": "8293ae960b0a0852d4d3813118030a1149a3ed9fe37bc2e1e7b3c2e62eb2d4b7",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/tokenizer.json": "783c7e86aedf79dd0aae603805c9591f397ca4475620b58f9a9b78151e2cfb7c",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/tokenizer_config.json": "fd142ccb926bc81fca665df274594ff19f9934b5e6103dc63ee643b3127f99ce",
+    "/home/appuser/.cache/huggingface/hub/models--microsoft--trocr-base-str/snapshots/26c151f56a7983e2cfcf05d55dc14f2f5f70ce64/vocab.json": "ed19656ea1707df69134c4af35c8ceda2cc9860bf2c3495026153a133670ab5e"
+  },
+  "selection": "locked before test; subsequent method selection uses dev only",
+  "real_test_policy": "ESTR60 deferred until the final project method is locked",
+  "protocol_sha256": "6ae349dcdbec34e575b20f0f13df46480aef0a7a1b9fb522917c79419cc2dc3b"
+}

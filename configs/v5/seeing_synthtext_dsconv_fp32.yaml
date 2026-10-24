@@ -1,0 +1,15 @@
+_base_: seeing_stage_base.yaml
+experiment:
+  id: Seeing_SynthText_paper_aug_20261021
+  role: paper-guided SynthText stage; crop/scale added; unpublished augmentation parameters are assumptions; no custom modules
+stage:
+  name: synthtext
+  epochs: 2
+  init_checkpoint: null
+data:
+  augment:
+    scale_crop_p: 1.0
+    scale_min: 0.75
+    scale_max: 1.5
+train:
+  out_dir: results/v5/detection/SynthText_dsconv_fp32_20261024

@@ -34,6 +34,17 @@ class BaseRecognizer(nn.Module):
     def predict(self, crops): raise NotImplementedError
     def encode_features(self, crops): raise NotImplementedError   # (N,T,C) tokens for the CIC loss
 
+    @torch.no_grad()
+    def teacher_features(self, crops):
+        """Stable CIC target without dropout or BN updates; preserve student modes."""
+        modes = [(module, module.training) for module in self.modules()]
+        self.eval()
+        try:
+            return self.encode_features(crops)
+        finally:
+            for module, training in modes:
+                module.training = training
+
 
 class CRNNRecognizer(BaseRecognizer):
     def __init__(self, charset: Charset | None = None, hidden=256, in_hw=(32, 128)):
@@ -49,6 +60,12 @@ class CRNNRecognizer(BaseRecognizer):
     def _seq(self, crops):
         x = F.interpolate(crops, size=self.in_hw, mode="bilinear", align_corners=False)
         f = self.cnn((x - 0.5) / 0.5).mean(2).transpose(1, 2)       # (N,T,256)
+        # Frozen eval-mode CRNN must still pass gradients to the enhancer/crop.
+        # cuDNN inference RNNs have no backward reserve; use the autograd path
+        # only when this eval-mode forward actually needs an input gradient.
+        if f.is_cuda and not self.rnn.training and torch.is_grad_enabled() and f.requires_grad:
+            with torch.backends.cudnn.flags(enabled=False):
+                return self.rnn(f)[0]
         return self.rnn(f)[0]
 
     def encode_features(self, crops): return self._seq(crops)

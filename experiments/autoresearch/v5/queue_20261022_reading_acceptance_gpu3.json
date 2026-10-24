@@ -1,0 +1,106 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/queue_20261022_reading_gpu3.json",
+  "scope": "After both fixed 20-pass baselines complete, freeze dev-selected checkpoints and evaluate each independent baseline once on official LSTR test. Public STR comparison only; no test-guided module selection, no ESTR60 access.",
+  "jobs": [
+    {
+      "id": "R0str_lock_after_complete_training",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "freeze",
+        "--config",
+        "configs/v5/reading_scene_text_frozen.yaml",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r0str_lstr.json",
+        "--baseline",
+        "R0str_public_scene_text",
+        "--output",
+        "results/v5/final/R0str_LSTR"
+      ],
+      "log": "results/v5/queue_logs/20261022_R0str_lock.log",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "R0str_locked_LSTR_test",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "evaluate",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r0str_lstr.json"
+      ],
+      "log": "results/v5/queue_logs/20261022_R0str_LSTR_test.log",
+      "report": "results/v5/final/R0str_LSTR/run.json",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "R2str_lock_after_complete_training",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "freeze",
+        "--config",
+        "configs/v5/reading_scene_text_lora.yaml",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r2str_lstr.json",
+        "--baseline",
+        "R2str_public_scene_text",
+        "--output",
+        "results/v5/final/R2str_LSTR",
+        "--checkpoint",
+        "results/v5/reading/R2str_lora/best.pt"
+      ],
+      "log": "results/v5/queue_logs/20261022_R2str_lock.log",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "R2str_locked_LSTR_test",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "evaluate",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r2str_lstr.json"
+      ],
+      "log": "results/v5/queue_logs/20261022_R2str_LSTR_test.log",
+      "report": "results/v5/final/R2str_LSTR/run.json",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "R4str_lock_after_complete_training",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "freeze",
+        "--config",
+        "configs/v5/reading_scene_text_joint.yaml",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r4str_lstr.json",
+        "--baseline",
+        "R4str_public_scene_text",
+        "--output",
+        "results/v5/final/R4str_LSTR",
+        "--checkpoint",
+        "results/v5/reading/R4str_joint/best.pt"
+      ],
+      "log": "results/v5/queue_logs/20261022_R4str_lock.log",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "R4str_locked_LSTR_test",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "evaluate",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/r4str_lstr.json"
+      ],
+      "log": "results/v5/queue_logs/20261022_R4str_LSTR_test.log",
+      "report": "results/v5/final/R4str_LSTR/run.json",
+      "timeout_seconds": 3600
+    }
+  ]
+}

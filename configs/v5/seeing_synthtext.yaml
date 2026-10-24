@@ -1,0 +1,7 @@
+_base_: seeing_stage_base.yaml
+stage:
+  name: synthtext
+  epochs: 2
+  init_checkpoint: null
+train:
+  out_dir: results/v5/detection/SynthText_pretrain

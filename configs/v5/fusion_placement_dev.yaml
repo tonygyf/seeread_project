@@ -1,0 +1,32 @@
+experiment:
+  id: C0_placement_dev
+  role: frozen-weight enhancement placement; development only; no custom modules
+data_root: data
+manifests:
+  bright: data/annotations/v5/fusion/totaltext_dev_bright.jsonl
+  dark: data/annotations/v5/fusion/totaltext_dev_dark.jsonl
+protocol: data/annotations/v5/fusion/totaltext_dev_protocol.json
+weights:
+  detector: null  # Set a locked, dev-selected V5 target detection best.pt after independent baseline evaluation.
+  reading: null   # Set one locked Self-DACE+TrOCR joint best.pt; its recognizer/enhancer are shared by A/B/C.
+cases:
+  A: none
+  B: after_crop
+  C: before_detector
+detector_hw: [640, 640]
+crop:
+  output_hw: [384, 384]
+  center_points: 32
+  pad: 1.0
+decoder:
+  text_threshold: 0.5
+  center_threshold: 0.5
+  rectangle_width: 6.0
+  sample_step: 3.0
+  max_samples: 64
+  close_kernel: 3
+  min_component_area: 3
+  min_polygon_area: 3
+  max_detections: 100
+memory_fraction: 0.35
+output: results/v5/fusion/C0_placement_dev

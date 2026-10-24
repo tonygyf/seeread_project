@@ -43,9 +43,49 @@ def _trim_ends(Pt, hs, conf, frac=0.7):
     return Pt[lo:hi], hs[lo:hi]
 
 
+def _sliced_centerline(pts, geo, text_p, step, k_max):
+    """Recognition geometry from cross-section centroids, in feature pixels.
+
+    The center segmentation target is a *band*. FPS deliberately visits its
+    edges; connecting these samples makes a zigzag even for perfect masks.
+    Average each cross section instead, and put its longitudinal coordinate at
+    a uniform sampling location. This keeps both endpoints rather than moving
+    them inward by half a bin. Like legacy principal-axis ordering, this assumes
+    the word does not double back along its principal axis.
+    """
+    origin = pts.mean(0)
+    axis = np.linalg.svd(pts - origin, full_matrices=False)[2][0]
+    if (abs(axis[0]) >= abs(axis[1]) and axis[0] < 0) or (abs(axis[0]) < abs(axis[1]) and axis[1] < 0):
+        axis = -axis
+    u = (pts - origin) @ axis
+    count = int(np.clip(np.ceil(np.ptp(u) / max(step, 1e-6)) + 1, 2, max(k_max, 2)))
+    locations = np.linspace(float(u.min()), float(u.max()), count)
+    boundaries = (locations[:-1] + locations[1:]) / 2
+    bins = np.searchsorted(boundaries, u, side="right")
+    centers, heights, confidence = [], [], []
+    for j, location in enumerate(locations):
+        section = pts[bins == j]
+        if not len(section):
+            continue
+        mean = section.mean(0)
+        centers.append(mean + axis * (location - float((mean - origin) @ axis)))
+        xi, yi = section[:, 0].astype(np.int32), section[:, 1].astype(np.int32)
+        heights.append(float(np.median(np.expm1(np.maximum(geo[0, yi, xi], 0)))))
+        confidence.append(float(np.mean(text_p[yi, xi])))
+    return (np.asarray(centers, np.float32), np.asarray(heights, np.float32),
+            np.asarray(confidence, np.float32))
+
+
 def tsr_decode(text_p, center_p, geo, stride=4, thr_center=0.5, thr_text=0.5, fixed_w=6.0,
-               step=3.0, min_area=8, k_max=32, close=5, trim_frac=0.7):
-    """text_p, center_p: HxW probs; geo: 3xHxW (log1p h, cos, sin) at feature res. Returns list of dicts in input px."""
+               step=3.0, min_area=8, k_max=32, close=5, trim_frac=0.7, centerline_mode="legacy"):
+    """Decode polygons and recognition strips in input pixels.
+
+    ``centerline_mode='sliced'`` changes only recognition centers/heights;
+    polygons, scores and detection ordering remain identical to ``legacy``.
+    Inputs are HxW text/center probabilities and 3xHxW (log1p h, cos, sin).
+    """
+    if centerline_mode not in ("legacy", "sliced"):
+        raise ValueError(f"Unknown centerline_mode: {centerline_mode!r}")
     Hf, Wf = text_p.shape
     cmask = ((center_p > thr_center) & (text_p > thr_text)).astype(np.uint8)
     n, lab = cv2.connectedComponents(cmask, connectivity=8)
@@ -82,6 +122,10 @@ def tsr_decode(text_p, center_p, geo, stride=4, thr_center=0.5, thr_text=0.5, fi
         order = order_along_principal_axis(P)
         Po, hso = P[order], np.array(hs, np.float32)[order]
         conf = text_p[Po[:, 1].astype(np.int32), Po[:, 0].astype(np.int32)]
+        if centerline_mode == "sliced":
+            Pc, hc, cc = _sliced_centerline(pts, geo, text_p, step, k_max)
+            if len(Pc) >= 2:
+                Po, hso, conf = Pc, hc, cc
         Po, hso = _trim_ends(Po, hso, conf, trim_frac)
         m = np.zeros((Hf, Wf), np.uint8); cv2.fillPoly(m, [cnt], 1)
         res.append(dict(poly=poly * stride, score=float(text_p[m > 0].mean()),

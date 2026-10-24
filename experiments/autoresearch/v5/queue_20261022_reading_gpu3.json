@@ -1,0 +1,109 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "wait_for_report": "results/v5/source_snapshots/trocr_base_str_26c151f.json",
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Independent public trocr-base-str checkpoint diagnostic and paired LoRA / Self-DACE+LoRA baselines; author checkpoint unknown. Same frozen LSTR train10146/dev1127, seed0, batch4 and 50740 updates (20 complete training passes). First 20min each for numerical/resource verification, then both resume to the same complete 20-pass baseline budget. Short-run CER does not cancel a registered baseline; only complete dev selects its best checkpoint. No old printed/S3/S4 weights, no official tests or ESTR60, no custom modules. Public STR pretraining includes some LSTR source benchmark training sets; no unseen-scene generalization claim. GPU2 independently completes Synth2 -> MLT100 -> LATeD250; MLT remains detection pretraining.",
+  "jobs": [
+    {
+      "id": "R0str_frozen_dev",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_scene_text_frozen.yaml",
+        "--mode",
+        "evaluate",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/reading/R0str_frozen/run.json",
+      "log": "results/v5/queue_logs/20261022_R0str_frozen.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "R2str_lora_short",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_scene_text_lora.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--max-seconds",
+        "1200",
+        "--max-steps",
+        "50740"
+      ],
+      "report": "results/v5/reading/R2str_lora/run.json",
+      "log": "results/v5/queue_logs/20261022_R2str_short.log",
+      "timeout_seconds": 1500
+    },
+    {
+      "id": "R4str_joint_short",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_scene_text_joint.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--max-seconds",
+        "1200",
+        "--max-steps",
+        "50740"
+      ],
+      "report": "results/v5/reading/R4str_joint/run.json",
+      "log": "results/v5/queue_logs/20261022_R4str_short.log",
+      "timeout_seconds": 1500
+    },
+    {
+      "id": "R2str_lora_20epoch",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_scene_text_lora.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--max-seconds",
+        "0",
+        "--max-steps",
+        "50740",
+        "--resume",
+        "results/v5/reading/R2str_lora/last.pt"
+      ],
+      "report": "results/v5/reading/R2str_lora/run.json",
+      "log": "results/v5/queue_logs/20261022_R2str_long.log",
+      "timeout_seconds": 86400
+    },
+    {
+      "id": "R4str_joint_20epoch",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_scene_text_joint.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--max-seconds",
+        "0",
+        "--max-steps",
+        "50740",
+        "--resume",
+        "results/v5/reading/R4str_joint/last.pt"
+      ],
+      "report": "results/v5/reading/R4str_joint/run.json",
+      "log": "results/v5/queue_logs/20261022_R4str_long.log",
+      "timeout_seconds": 86400
+    }
+  ]
+}

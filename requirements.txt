@@ -9,6 +9,8 @@ tqdm
 transformers>=4.40
 scipy>=1.10
 peft>=0.10
+# Official DSCNet optimized 2D operator used by the independent v5 detector.
+einops==0.8.1
 # LaTeX table export / plotting
 pandas
 matplotlib

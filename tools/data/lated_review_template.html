@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>LATeD test 转写评审</title>
+<style>
+  body{font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;display:flex;height:100vh;background:#1e1e1e;color:#ddd}
+  #side{width:230px;overflow-y:auto;border-right:1px solid #444;padding:8px;box-sizing:border-box}
+  #main{flex:1;padding:24px;box-sizing:border-box;max-width:860px;margin:0 auto}
+  .imgbtn{display:block;width:100%;text-align:left;background:none;border:0;color:#9cf;cursor:pointer;padding:2px 4px;font-size:12px}
+  .imgbtn:hover{background:#333}
+  .imgbtn.done{color:#6a6}
+  #cropbox{background:repeating-conic-gradient(#222 0 25%,#333 0 50%) 0 0/16px 16px;display:inline-block;padding:6px;border-radius:6px}
+  #crop{image-rendering:pixelated;height:110px;display:block}
+  #meta{color:#999;font-size:12px;margin:8px 0}
+  #txt{width:100%;box-sizing:border-box;font-size:20px;padding:8px;background:#111;color:#fff;border:1px solid #555;border-radius:4px}
+  .row{margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{padding:6px 14px;background:#2b6cb0;color:#fff;border:0;border-radius:4px;cursor:pointer}
+  button.gray{background:#444}
+  #preds{font-size:13px;color:#aaa;margin:6px 0}
+  #prog{position:fixed;top:8px;right:16px;font-size:13px;color:#9cf}
+  label{font-size:13px}
+  select,input[type=checkbox]{vertical-align:middle}
+  #pos{color:#888;font-size:12px}
+</style>
+</head>
+<body>
+<div id="side">
+  <div style="margin:6px 0"><select id="filter" style="width:100%">
+    <option value="all">全部</option><option value="todo">未完成</option>
+    <option value="disagree">预填不一致</option><option value="flag">已标记坏裁剪</option>
+  </select></div>
+  <div id="list"></div>
+</div>
+<div id="main">
+  <div id="pos"></div>
+  <div id="cropbox"><img id="crop" alt=""></div>
+  <div id="meta"></div>
+  <div id="preds"></div>
+  <input id="txt" autocomplete="off" spellcheck="false" placeholder="输入正确转写（空=跳过）">
+  <div class="row">
+    <button onclick="next(1)">保存并下一个 (Enter)</button>
+    <button class="gray" onclick="next(-1)">上一个</button>
+    <label><input type="checkbox" id="flag"> 坏裁剪/看不清</label>
+    <span style="flex:1"></span>
+    <button class="gray" onclick="location.href='javascript:history.back()'"> </button>
+    <button onclick="exportJson()">导出 JSON</button>
+    <button class="gray" onclick="if(confirm('清空全部本地记录？')){localStorage.removeItem(KEY);load()}">清空</button>
+  </div>
+  <p style="color:#777;font-size:12px">说明：方框内为 GT 框亮图裁剪。机器预填见"预填"行（亮/暗两路），大部分正确时直接回车。
+     不确定的留空或勾选"坏裁剪"。进度自动保存在浏览器 localStorage。导出后交给 tools/data/finalize_lated.py 合并。</p>
+</div>
+<div id="prog"></div>
+<script>
+const ITEMS = __ITEMS__;
+const KEY = 'lated_trans_v1';
+let state = JSON.parse(localStorage.getItem(KEY) || '{}');
+let order = ITEMS.map((_, i) => i);
+let cur = 0;
+
+function byId(id){ return ITEMS.find(x => x.id === id); }
+function rec(id){ return state[id] || (state[id] = {t: '', f: false, d: false}); }
+function done(it){ const r = state[it.id]; return r && (r.t.trim() !== '' || r.f); }
+
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); refreshProg(); }
+
+function refreshList(){
+  const filt = document.getElementById('filter').value;
+  const box = document.getElementById('list'); box.innerHTML = '';
+  const groups = {};
+  ITEMS.forEach((it, i) => { (groups[it.img] = groups[it.img] || []).push(i); });
+  for (const img of Object.keys(groups)){
+    const idxs = groups[img];
+    let show = true;
+    if (filt === 'todo') show = idxs.some(i => !done(ITEMS[i]));
+    if (filt === 'flag') show = idxs.some(i => state[ITEMS[i].id] && state[ITEMS[i].id].f);
+    if (filt === 'disagree') show = idxs.some(i => { const it = ITEMS[i];
+      return !it.tiny && it.pred_b.trim() !== it.pred_d.trim(); });
+    if (!show) continue;
+    const b = document.createElement('button');
+    b.className = 'imgbtn' + (idxs.every(i => done(ITEMS[i])) ? ' done' : '');
+    const nDone = idxs.filter(i => done(ITEMS[i])).length;
+    b.textContent = `${img} ${nDone}/${idxs.length}`;
+    b.onclick = () => { cur = idxs.find(i => !done(ITEMS[i])) ?? idxs[0]; show(); };
+    box.appendChild(b);
+  }
+}
+
+function show(){
+  if (!order.length) return;
+  cur = Math.max(0, Math.min(order.length - 1, cur));
+  const it = ITEMS[order[cur]];
+  const r = rec(it.id);
+  document.getElementById('crop').src = 'crops/' + it.id + '.jpg';
+  document.getElementById('pos').textContent = `${cur + 1} / ${order.length}   图: ${it.img}`;
+  document.getElementById('meta').textContent = `语言: ${it.lang}${it.tiny ? '   [高度不足, 仅参考]' : ''}`;
+  document.getElementById('preds').textContent =
+    it.tiny ? '' : `预填: 亮=${it.pred_b || '(空)'}   暗+增强=${it.pred_d || '(空)'}${it.pred_b.trim() === it.pred_d.trim() ? '   [两路一致]' : '   [不一致, 请细看]'}`;
+  const t = document.getElementById('txt'); t.value = r.t;
+  document.getElementById('flag').checked = r.f;
+  t.focus(); t.select();
+}
+
+function next(step){
+  const it = ITEMS[order[cur]];
+  const r = rec(it.id);
+  r.t = document.getElementById('txt').value;
+  r.f = document.getElementById('flag').checked;
+  r.d = true; save();
+  cur += step; show();
+}
+
+function refreshProg(){
+  const n = ITEMS.filter(done).length;
+  document.getElementById('prog').textContent = `已完成 ${n} / ${ITEMS.length}`;
+}
+
+function exportJson(){
+  // flush current input
+  const it = ITEMS[order[cur]];
+  const r = rec(it.id);
+  r.t = document.getElementById('txt').value; r.f = document.getElementById('flag').checked; save();
+  const out = {};
+  for (const x of ITEMS) out[x.id] = {t: (state[x.id] || {}).t || '', f: !!((state[x.id] || {}).f)};
+  const blob = new Blob([JSON.stringify(out, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'lated_test_transcriptions.json';
+  a.click();
+}
+
+document.getElementById('txt').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); next(1); }
+});
+document.getElementById('filter').onchange = refreshList;
+
+function load(){ refreshList(); refreshProg(); show(); }
+load();
+</script>
+</body>
+</html>

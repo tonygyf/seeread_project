@@ -1,0 +1,47 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "User authorized intermediate-checkpoint dev connector evaluation before final Seeing baseline; then resume CTW prerequisite wait. GPU2 unaffected.",
+  "jobs": [
+    {
+      "id": "supported_boundary_connector_actual",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/diagnostics/connector_actual_20261023/detector.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_supported_20261023",
+        "--sampling",
+        "boundary_when_supported"
+      ],
+      "report": "results/v5/fusion/connector_supported_20261023/run.json",
+      "log": "results/v5/queue_logs/20261023_connector_supported_gpu3.log",
+      "timeout_seconds": 7200
+    },
+    {
+      "id": "CTW250_after_shared_MLT100",
+      "argv": [
+        "python",
+        "tools/v5_train_detection_branch.py",
+        "--pipeline",
+        "configs/v5/seeing_pipeline_ctw1500_pm_fp32.yaml",
+        "--upstream-state",
+        "results/v5/queue_20261023_detection_pm_fp32.json"
+      ],
+      "report": "results/v5/detection/CTW1500_pm_fp32/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261023_CTW_after_supported_connector_gpu3.log",
+      "timeout_seconds": 604800
+    }
+  ]
+}

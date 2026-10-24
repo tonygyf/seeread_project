@@ -1,0 +1,4 @@
+stages:
+  - seeing_synthtext_head_fp32.yaml
+  - seeing_mlt17_head_fp32.yaml
+  - seeing_lated_head_fp32.yaml

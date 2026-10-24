@@ -1,0 +1,15 @@
+_base_: seeing_stage_base.yaml
+stage:
+  name: target
+  epochs: 250
+  init_checkpoint: results/v5/detection/MLT17_classification_fp32/last.pt
+data:
+  train_manifest: data/annotations/v5/detection/latedspot_train.jsonl
+  dev_manifest: data/annotations/v5/detection/latedspot_val.jsonl
+  require_fingerprint: true
+  augment:
+    scale_crop_p: 1.0
+    scale_min: 0.75
+    scale_max: 1.5
+train:
+  out_dir: results/v5/detection/LATeD_classification_fp32

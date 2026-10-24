@@ -1,0 +1,223 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "wait_for_report": "results/v5/reading/R2b_lora_short/run.json",
+  "scope": "independent paper-guided baselines; MLT missing so no full Seeing reproduction claim; ESTR60 untouched",
+  "jobs": [
+    {
+      "id": "D0_detection_sanity",
+      "argv": [
+        "python",
+        "tools/v5_detection_pilot.py",
+        "--config",
+        "configs/v5/seeing_lated_pilot.yaml"
+      ],
+      "report": "results/v5/detection/D0_lated_overfit_sanity/status.json",
+      "log": "results/v5/queue_logs/D0_detection_sanity.log",
+      "timeout_seconds": 1500,
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "max_steps_stop",
+        "time_budget_stop",
+        "budget_stop",
+        "stage_complete",
+        "budget_stop_partial_validation"
+      ]
+    },
+    {
+      "id": "R4_numeric_preflight",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_paper_preflight.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/reading/R4_gpu_preflight/run.json",
+      "log": "results/v5/queue_logs/R4_numeric_preflight.log",
+      "timeout_seconds": 420
+    },
+    {
+      "id": "R4_paper_joint_short",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_paper_joint_short.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/reading/R4_paper_joint_short/run.json",
+      "log": "results/v5/queue_logs/R4_paper_joint_short.log",
+      "timeout_seconds": 1500
+    },
+    {
+      "id": "R0_bright_control",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_frozen_lit.yaml",
+        "--mode",
+        "evaluate",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/reading/R0_frozen_lit/run.json",
+      "log": "results/v5/queue_logs/R0_bright_control.log",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "R1_bright_control",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_srdace_frozen_lit.yaml",
+        "--mode",
+        "evaluate",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/reading/R1_srdace_frozen_lit/run.json",
+      "log": "results/v5/queue_logs/R1_bright_control.log",
+      "timeout_seconds": 600
+    },
+    {
+      "id": "R0_locked_LSTR_test",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "evaluate",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/R0_lstr_v2.json"
+      ],
+      "report": "results/v5/final/R0_LSTR/run.json",
+      "log": "results/v5/queue_logs/R0_locked_LSTR_test.log",
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "R1_locked_LSTR_test",
+      "argv": [
+        "python",
+        "tools/v5_final_reading.py",
+        "evaluate",
+        "--protocol",
+        "experiments/autoresearch/v5/locked/R1_lstr_v2.json"
+      ],
+      "report": "results/v5/final/R1_LSTR/run.json",
+      "log": "results/v5/queue_logs/R1_locked_LSTR_test.log",
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "Seeing_SynthText_short",
+      "argv": [
+        "python",
+        "tools/v5_train_detection.py",
+        "--config",
+        "configs/v5/seeing_synthtext.yaml",
+        "--allow-reduced-data"
+      ],
+      "report": "results/v5/detection/SynthText_pretrain/status.json",
+      "log": "results/v5/queue_logs/Seeing_SynthText_short.log",
+      "timeout_seconds": 1800,
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "max_steps_stop",
+        "time_budget_stop",
+        "budget_stop",
+        "stage_complete"
+      ]
+    },
+    {
+      "id": "R2b_lora_long",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_lora_corrected_short.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--resume",
+        "results/v5/reading/R2b_lora_short/last.pt",
+        "--max-seconds",
+        "7200",
+        "--max-steps",
+        "50740"
+      ],
+      "report": "results/v5/reading/R2b_lora_short/run.json",
+      "log": "results/v5/queue_logs/R2b_lora_long.log",
+      "timeout_seconds": 7800,
+      "development_gate": {
+        "candidate_report": "results/v5/reading/R2b_lora_short/run.json",
+        "reference_report": "results/v5/reading/R0_frozen/run.json",
+        "minimum_cer_improvement": 0.01
+      }
+    },
+    {
+      "id": "R4_paper_joint_long",
+      "argv": [
+        "python",
+        "tools/v5_reading.py",
+        "--config",
+        "configs/v5/reading_paper_joint_short.yaml",
+        "--mode",
+        "train",
+        "--device",
+        "cuda:0",
+        "--resume",
+        "results/v5/reading/R4_paper_joint_short/last.pt",
+        "--max-seconds",
+        "7200",
+        "--max-steps",
+        "50740"
+      ],
+      "report": "results/v5/reading/R4_paper_joint_short/run.json",
+      "log": "results/v5/queue_logs/R4_paper_joint_long.log",
+      "timeout_seconds": 7800,
+      "development_gate": {
+        "candidate_report": "results/v5/reading/R4_paper_joint_short/run.json",
+        "reference_report": "results/v5/reading/R1_srdace_frozen/run.json",
+        "minimum_cer_improvement": 0.01
+      }
+    },
+    {
+      "id": "Seeing_SynthText_long",
+      "argv": [
+        "python",
+        "tools/v5_train_detection.py",
+        "--config",
+        "configs/v5/seeing_synthtext_long.yaml",
+        "--allow-reduced-data",
+        "--resume",
+        "results/v5/detection/SynthText_pretrain/last.pt"
+      ],
+      "report": "results/v5/detection/SynthText_pretrain/status.json",
+      "log": "results/v5/queue_logs/Seeing_SynthText_long.log",
+      "timeout_seconds": 7800,
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "max_steps_stop",
+        "time_budget_stop",
+        "budget_stop",
+        "stage_complete"
+      ]
+    }
+  ]
+}

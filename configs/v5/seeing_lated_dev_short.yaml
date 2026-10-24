@@ -1,0 +1,16 @@
+_base_: seeing_stage_base.yaml
+experiment:
+  id: D1_reduced_lated_short
+  role: public ImageNet start; 900 LATeD train and 100 dev; no SynthText or MLT inheritance; diagnostic, not full paper reproduction
+stage:
+  name: target
+  epochs: 250
+  init_checkpoint: null
+data:
+  train_manifest: data/annotations/v5/detection/latedspot_train.jsonl
+  dev_manifest: data/annotations/v5/detection/latedspot_val.jsonl
+  require_fingerprint: true
+train:
+  out_dir: results/v5/detection/D1_reduced_lated_short
+  max_seconds: 1200
+  max_steps: 0

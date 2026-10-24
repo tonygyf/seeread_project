@@ -1,0 +1,59 @@
+experiment:
+  version: 5
+  role: paper-guided detection reconstruction; not author implementation or official benchmark
+stage:
+  name: synthtext
+  epochs: 2
+  init_checkpoint: null
+detector:
+  type: seeing
+  channels: 256
+  pretrained: true
+  source_root: /opt/dscnet
+  kernel_size: 9
+data:
+  root: data
+  train_manifest: data/annotations/v5/detection/synthtext_train.reference.json
+  dev_manifest: data/annotations/v5/detection/ctw1500_dev.jsonl
+  protocol_provenance: data/annotations/v5/detection/provenance.json
+  image_fingerprints: data/annotations/v5/detection/image_fingerprints.jsonl
+  require_fingerprint: false
+  image_hw: [640, 640]
+  feature_hw: [160, 160]
+  center_shrink: 0.3
+  augment:
+    flip_p: 0.5
+    rotate_p: 0.5
+    rotate_degrees: 10.0
+    color_p: 0.5
+    color_strength: 0.2
+    noise_p: 0.3
+    noise_std: 0.02
+train:
+  device: cuda:0
+  out_dir: results/v5/detection/SynthText_pretrain
+  seed: 0
+  memory_fraction: 0.35
+  max_seconds: 0  # Formal stages run to their declared epoch count; short configs override this.
+  max_steps: 0
+  batch_size: 10
+  val_batch_size: 2
+  workers: 4
+  lr: 1.0e-4
+  lr_step_epochs: 100
+  lr_gamma: 0.1
+  amp: true
+  grad_clip: 5.0
+  val_every_epochs: 1
+  save_every_updates: 200
+  log_every: 20
+decoder:
+  text_threshold: 0.5
+  center_threshold: 0.5
+  rectangle_width: 6.0
+  sample_step: 3.0
+  max_samples: 64
+  close_kernel: 3
+  min_component_area: 3
+  min_polygon_area: 3
+  max_detections: 100

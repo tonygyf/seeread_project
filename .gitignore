@@ -9,6 +9,11 @@ dist/
 .mypy_cache/
 .ruff_cache/
 .cache/
+cache/
+caches/
+.venv/
+venv/
+.ipynb_checkpoints/
 
 # --- Local environment (template .env.example is tracked) ---
 .env
@@ -16,6 +21,7 @@ dist/
 !.env.example
 
 # --- Datasets & experiment outputs: keep the directory skeleton, ignore contents ---
+data/derived/
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/README.md
@@ -30,6 +36,38 @@ data/images_lit/*
 !data/images_lit/README.md
 results/*
 !results/.gitkeep
+
+# --- Generated media, archives and model files ---
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.tif
+*.tiff
+*.zip
+*.tar
+*.gz
+*.7z
+*.rar
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+*.npy
+*.npz
+*.tfevents*
+wandb/
+mlruns/
+runs/
+lightning_logs/
+
+# Selected compact inference weights; full checkpoints stay local.
+!weights/reading/R2str_lora.pt
+!weights/reading/R4str_joint.pt
 
 # --- OS / editor ---
 .DS_Store

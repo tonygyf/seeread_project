@@ -1,0 +1,4 @@
+stages:
+  - seeing_synthtext_dsconv_fp32.yaml
+  - seeing_mlt17_dsconv_fp32.yaml
+  - seeing_ctw1500_dsconv_fp32.yaml

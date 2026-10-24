@@ -1,0 +1,22 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Fixed R4str best checkpoint, full/no_denoise/identity enhancement removal on1127 development words only; no new training or test inference.",
+  "jobs": [
+    {
+      "id": "R4str_enhancer_removal_dev",
+      "argv": [
+        "python",
+        "tools/v5_ablate_reading.py",
+        "--checkpoint",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/reading/R4str_enhancer_removal_dev"
+      ],
+      "report": "results/v5/reading/R4str_enhancer_removal_dev/run.json",
+      "log": "results/v5/queue_logs/20261022_R4str_enhancer_removal_dev.log",
+      "timeout_seconds": 1200
+    }
+  ]
+}

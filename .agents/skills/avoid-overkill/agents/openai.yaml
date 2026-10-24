@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avoid Overkill"
+  short_description: "Keep engineering lean and paper claims direct"
+  default_prompt: "Use $avoid-overkill to keep this engineering or paper-writing task proportional, evidence-grounded, and claim-centered."

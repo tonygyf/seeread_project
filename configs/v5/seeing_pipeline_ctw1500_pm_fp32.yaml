@@ -1,0 +1,4 @@
+stages:
+  - seeing_synthtext_pm_fp32.yaml
+  - seeing_mlt17_pm_fp32.yaml
+  - seeing_ctw1500_pm_fp32.yaml

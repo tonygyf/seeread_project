@@ -1,0 +1,3 @@
+# Preserve the known working project CUDA runtime; add only the DSConv helper.
+FROM seeread:latest
+RUN pip install --no-cache-dir einops==0.8.1

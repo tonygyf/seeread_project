@@ -69,5 +69,5 @@ USER appuser
 
 # Default follows the quick-start in docs/01_research_design.md.
 # Override with any tools/ command, e.g.:
-#   docker compose run --rm seeread python tools/train.py --config configs/seeread_joint.yaml
+#   docker compose run --rm seeread python tools/legacy/train.py --config configs/legacy/seeread_joint.yaml
 CMD ["python", "tests/test_smoke.py"]

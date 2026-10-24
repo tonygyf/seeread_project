@@ -1,3 +1,0 @@
-_base_: base.yaml
-model: {use_ctx: false}
-train: {out_dir: results/abl_no_ctx}

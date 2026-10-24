@@ -1,0 +1,29 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "CTW250 after shared completed MLT100; restored upstream after numerical migration; no official tests.",
+  "jobs": [
+    {
+      "id": "CTW250_after_shared_MLT100",
+      "argv": [
+        "python",
+        "tools/v5_train_detection_branch.py",
+        "--pipeline",
+        "configs/v5/seeing_pipeline_ctw1500_dsconv_fp32.yaml",
+        "--upstream-state",
+        "results/v5/queue_20261024_detection_dsconv_fp32.json"
+      ],
+      "report": "results/v5/detection/CTW1500_dsconv_fp32/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261024_CTW_shared_MLT_gpu3.log",
+      "timeout_seconds": 604800
+    }
+  ]
+}

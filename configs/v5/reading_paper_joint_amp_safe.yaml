@@ -1,0 +1,8 @@
+_base_: reading_paper_joint_short.yaml
+experiment:
+  id: R4b_amp_safe
+  role: fresh public-initialized Reading joint; consecutive AMP rejection policy; no old R4 weight migration
+train:
+  out_dir: results/v5/reading/R4b_amp_safe
+  max_seconds: 1200
+  max_steps: 0

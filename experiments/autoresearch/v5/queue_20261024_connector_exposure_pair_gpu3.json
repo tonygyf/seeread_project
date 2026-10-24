@@ -1,0 +1,52 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Paired none/p95 with identical explicitly migrated Syn109600 snapshot; model tensors verified unchanged; pad1.1/full and fixed dev. Official evaluation deferred.",
+  "jobs": [
+    {
+      "id": "connector_exposure_none",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/diagnostics/connector_dsconv_20261024/detector.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_exposure_pair_20261024/none",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1",
+        "--exposure",
+        "none"
+      ],
+      "report": "results/v5/fusion/connector_exposure_pair_20261024/none/run.json",
+      "log": "results/v5/queue_logs/20261024_connector_exposure_pair_none_gpu3.log",
+      "timeout_seconds": 7200
+    },
+    {
+      "id": "connector_exposure_p95",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/diagnostics/connector_dsconv_20261024/detector.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_exposure_pair_20261024/p95",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1",
+        "--exposure",
+        "p95"
+      ],
+      "report": "results/v5/fusion/connector_exposure_pair_20261024/p95/run.json",
+      "log": "results/v5/queue_logs/20261024_connector_exposure_pair_p95_gpu3.log",
+      "timeout_seconds": 7200
+    }
+  ]
+}

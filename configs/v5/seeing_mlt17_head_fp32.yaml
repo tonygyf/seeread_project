@@ -1,0 +1,17 @@
+_base_: seeing_stage_base.yaml
+stage:
+  name: mlt17
+  epochs: 100
+  init_checkpoint: results/v5/detection/SynthText_head_fp32_20261022/last.pt
+data:
+  train_manifest: data/annotations/v5/detection/mlt17_train.reference.json
+  dev_manifest: data/annotations/v5/detection/mlt17_dev.jsonl
+  protocol_provenance: data/annotations/v5/detection/mlt17_train.reference.json
+  image_fingerprints: data/annotations/v5/detection/mlt17_image_fingerprints.jsonl
+  require_fingerprint: true
+  augment:
+    scale_crop_p: 1.0
+    scale_min: 0.75
+    scale_max: 1.5
+train:
+  out_dir: results/v5/detection/MLT17_head_fp32

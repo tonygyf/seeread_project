@@ -1,0 +1,30 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Single-factor image-only crop p95 exposure vs completed pad1.1/full; frozen Syn109600/R4best, dev only. Official evaluation deferred.",
+  "jobs": [
+    {
+      "id": "connector_p95_exposure",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/diagnostics/connector_actual_20261023/detector.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_exposure_20261024",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1",
+        "--exposure",
+        "p95"
+      ],
+      "report": "results/v5/fusion/connector_exposure_20261024/run.json",
+      "log": "results/v5/queue_logs/20261024_connector_exposure_gpu3.log",
+      "timeout_seconds": 7200
+    }
+  ]
+}

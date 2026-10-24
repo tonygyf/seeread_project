@@ -1,0 +1,4 @@
+stages:
+  - seeing_synthtext_classification_fp32.yaml
+  - seeing_mlt17_classification_fp32.yaml
+  - seeing_lated_classification_fp32.yaml

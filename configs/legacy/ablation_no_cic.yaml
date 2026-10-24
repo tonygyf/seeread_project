@@ -1,0 +1,3 @@
+_base_: ../base.yaml
+loss: {cic: 0.0}
+train: {out_dir: results/abl_no_cic}

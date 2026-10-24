@@ -65,8 +65,7 @@ class SeeRead(nn.Module):
             lit_cat = torch.cat(crops_lit)
             losses["enh_rec"] = w.enh_rec * F.l1_loss(y[torch.tensor(idx_paired, device=y.device)], lit_cat)
         if crops_lit and w.cic > 0:
-            with torch.no_grad():
-                f_lit = self.rec.encode_features(torch.cat(crops_lit))
+            f_lit = self.rec.teacher_features(torch.cat(crops_lit))
             f_dark = self.rec.encode_features(y[torch.tensor(idx_paired, device=y.device)])   # paired crops only
             losses["cic"] = w.cic * cic_loss(f_dark, f_lit)
         return losses
@@ -82,7 +81,9 @@ class SeeRead(nn.Module):
         geo = torch.cat([out["geo"][:, :1].clamp(min=0), out["geo"][:, 1:]], 1).cpu().numpy()
         results = []
         for b in range(img.size(0)):
-            dets = tsr_decode(tp[b], cp[b], geo[b], self.stride, thr_center, thr_text)[:max_det]
+            mode = getattr(self.cfg.model, "centerline_mode", "legacy")
+            decode_kwargs = {} if mode == "legacy" else {"centerline_mode": mode}
+            dets = tsr_decode(tp[b], cp[b], geo[b], self.stride, thr_center, thr_text, **decode_kwargs)[:max_det]
             crops = []
             for d in dets:
                 if len(d["centers"]) < 2:
@@ -90,9 +91,12 @@ class SeeRead(nn.Module):
                 crops.append(rectify_strip(img[b:b + 1], torch.from_numpy(d["centers"]).float().to(img.device),
                                            torch.from_numpy(d["heights"]).float().to(img.device), self.crop_hw))
             if crops:
-                x = torch.cat(crops)
-                y, _ = self.enh(x, ctx[b:b + 1].expand(len(crops), -1))
-                texts = self.rec.predict(y)
+                texts = []
+                chunk = int(getattr(self.cfg.model, "rec_infer_batch", 8))
+                for start in range(0, len(crops), chunk):
+                    x = torch.cat(crops[start:start + chunk])
+                    y, _ = self.enh(x, ctx[b:b + 1].expand(len(x), -1))
+                    texts.extend(self.rec.predict(y))
             else:
                 texts = []
             results.append([dict(poly=d["poly"], score=d["score"], text=t) for d, t in zip(dets, texts)])

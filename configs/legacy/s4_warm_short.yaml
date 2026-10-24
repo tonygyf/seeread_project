@@ -1,0 +1,60 @@
+data:
+  root: data/
+  train_ann: data/annotations/latedspot_train.jsonl
+  val_ann: data/annotations/totaltext_val.jsonl
+  test_ann: data/annotations/latedspot_test.jsonl
+  size: 640
+  synth_mode: physical
+  workers: 0
+  train_anns:
+  - data/annotations/totaltext_train_main.jsonl
+  - data/annotations/icdar2015_train.jsonl
+  - data/annotations/synthtext_train.jsonl
+  mix_weights:
+  - 1.0
+  - 1.0
+  - 1.0
+  mix_samples_per_epoch: 400
+model:
+  det_ch: 128
+  pretrained: false
+  ctx_dim: 128
+  crop_hw:
+  - 64
+  - 256
+  enh_iters: 6
+  use_ctx: true
+  use_scm: true
+  centerline_mode: sliced
+  rec_infer_batch: 8
+rec:
+  type: trocr
+  charset_file: null
+  name: microsoft/trocr-base-printed
+  lora_r: 16
+  lora_alpha: 32
+  freeze: false
+loss:
+  det: 1.0
+  rec: 1.0
+  enh: 0.1
+  enh_rec: 0.0
+  cic: 0.5
+train:
+  stage: rec
+  epochs: 100
+  batch_size: 2
+  lr: 2.0e-05
+  weight_decay: 0.0001
+  pred_geom_warmup: 0.5
+  amp: true
+  seed: 0
+  out_dir: results/archive/legacy/autoresearch/s4_warm_short_20261019b
+  resume: null
+  init_det: results/archive/legacy/v2/s3_joint_v2/best.pt
+  init_rec: null
+  val_every: 1
+  val_condition: dark
+  require_cuda: true
+  amp_dtype: float16
+  early_stop_patience: 3

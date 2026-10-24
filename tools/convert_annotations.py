@@ -10,8 +10,9 @@ Usage:
   python tools/convert_annotations.py --dataset synthtext --raw data/raw --out data/annotations
       -> synthtext_train.jsonl (wordBB 4-corner ring -> CTW convention, transcriptions kept)
 
-LATeD/CTW labels carry polygons only (no transcriptions) -> text="###", ignore=false: valid det GT,
-rec/e2e simply not scored. Explicit ignore=true is reserved for protocol don't-care (TotalText '#').
+LATeD/CTW detection-only labels use text="###" without opting out of detection.
+Preserve explicit source ignore flags (including CTW1500 MMOCR don't-care);
+missing transcription by itself does not imply ignore.
 Instance/meta ids keep traceability to raw image + label line.
 Polygons are normalised to the CTW1500 convention (top edge L->R, then bottom edge R->L):
 ambiguous (near-vertical) polys are left unchanged and counted.
@@ -47,7 +48,7 @@ def normalize_ring(poly):
 
 
 def poly_list(flat):
-    if len(flat) < 8 or len(flat) % 2 or not all(np.isfinite(flat)):
+    if len(flat) < 6 or len(flat) % 2 or not all(np.isfinite(flat)):
         STATS["poly_invalid_dropped"] += 1
         return None
     pts = np.asarray(flat, np.float32).reshape(-1, 2)
@@ -85,8 +86,9 @@ def write_jsonl(path, rows):
 
 def summary(name, rows):
     n_ins = sum(len(r["instances"]) for r in rows)
-    n_ign = sum(i.get("ignore") or i["text"] in ("###", "") for r in rows for i in r["instances"])
-    print(f"[{name}] images={len(rows)} instances={n_ins} ignore={n_ign}")
+    n_ign = sum(bool(i.get("ignore")) for r in rows for i in r["instances"])
+    n_det_only = sum(not i.get("ignore") and i["text"] in ("###", "") for r in rows for i in r["instances"])
+    print(f"[{name}] images={len(rows)} instances={n_ins} ignore={n_ign} det_only={n_det_only}")
 
 
 def qa_sheet(path, root, rows, k=12, tag=""):
@@ -190,8 +192,8 @@ def conv_ctw1500(raw, out, root, split):
             if p is None:
                 STATS["ctw_instance_skipped"] += 1
                 continue
-            # CTW ships geometry only: polygons are valid text -> det GT; "###" excludes rec/e2e only
-            ins.append(dict(poly=p, text="###", lang="en", ignore=False,
+            # MMOCR's detection packer omits text but retains don't-care flags.
+            ins.append(dict(poly=p, text="###", lang="en", ignore=bool(g.get("ignore", False)),
                             id=f"{os.path.basename(item['img_path'])}#{gi}"))
         rows.append(make_row(rel, ins, dict(source="CTW1500-mmocr", illum_kind="lit", scene="ctw",
                                             id=os.path.basename(item["img_path"]))))
@@ -201,23 +203,31 @@ def conv_ctw1500(raw, out, root, split):
         qa_sheet(os.path.join("results", "qa", "convert_ctw1500_test.png"), root, rows, tag="ctw1500 test")
 
 
-TT_RE = re.compile(r"x: \[\[([\d\s.\-eE+]+)\]\], y: \[\[([\d\s.\-eE+]+)\]\], ornt: \[u?'?([^'\]]*)'?\], transcriptions: \[(.*)\]\s*$")
+TT_RE = re.compile(r"x: \[\[([\d\s.\-eE+]+)\]\], y: \[\[([\d\s.\-eE+]+)\]\], ornt: \[(?:u?['\"](.*?)['\"])?\], transcriptions: \[(.*)\]\s*$")
 
 
 def _tt_texts(s):
+    # A released label escapes the outer transcription quotes as u\'...\'.
+    escaped = re.fullmatch(r"u\\'(.*)\\'", s.strip())
+    if escaped:
+        s = "u'" + escaped.group(1) + "'"
     return [a or b for a, b in re.findall(r"u?'([^']*)'|u?\"([^\"]*)\"", s)]
 
 
 def conv_totaltext(raw, out, root, split):
     base = os.path.join(raw, "TotalText")
     gt_dir = os.path.join(base, "txt_format", split.capitalize())
+    image_dir = os.path.join(base, "Images", split.capitalize())
+    image_names = {os.path.splitext(name)[0]: name for name in os.listdir(image_dir)
+                   if os.path.splitext(name)[1].lower() in (".jpg", ".jpeg", ".png")}
     names = sorted(f[8:-4] for f in os.listdir(gt_dir) if f.startswith("poly_gt_"))
     rows = []
     for nid in names:
-        rel = f"raw/TotalText/Images/{split.capitalize()}/{nid}.jpg"
-        if not os.path.exists(os.path.join(root, rel)):
-            STATS["tt_missing_image_skipped"] += 1     # official release gap, e.g. img61
+        name = image_names.get(nid)
+        if name is None:
+            STATS["tt_missing_image_skipped"] += 1
             continue
+        rel = f"raw/TotalText/Images/{split.capitalize()}/{name}"
         raw_lines = open(os.path.join(gt_dir, f"poly_gt_{nid}.txt")).read().splitlines()
         joined, buf = [], ""
         for ln in raw_lines:                            # re-join annotation-tool line wraps
@@ -233,13 +243,15 @@ def conv_totaltext(raw, out, root, split):
                 STATS["tt_line_unparsed"] += 1
                 continue
             xs, ys_, ornt, tr = m.groups()
+            ornt = ornt or ""
             xy = list(zip([float(v) for v in xs.split()], [float(v) for v in ys_.split()]))
             p = poly_list([c for pt in xy for c in pt])
             if p is None:
                 STATS["tt_instance_skipped"] += 1
                 continue
             text = (_tt_texts(tr) + [""])[0]
-            dontcare = text in ("#", "")
+            # Author column6 is the don't-care marker, independent of transcription.
+            dontcare = ornt == "#"
             rec = dict(poly=p, text="###" if dontcare else text, lang="en", ignore=dontcare,
                        ornt=ornt, id=f"{nid}#{li}")
             if dontcare and text:
