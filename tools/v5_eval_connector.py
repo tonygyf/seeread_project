@@ -122,7 +122,8 @@ if __name__ == '__main__':
     parser.add_argument('--detector', type=Path, required=True)
     parser.add_argument('--reading', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--sampling', nargs='+', choices=('local_normal', 'polygon_boundary', 'boundary_when_supported'),
+    parser.add_argument('--sampling', nargs='+', choices=('local_normal', 'polygon_boundary', 'boundary_when_supported',
+                                                        'boundary_with_hull_fallback'),
                         default=['local_normal', 'polygon_boundary'])
     parser.add_argument('--crop-pad', type=float, default=1.)
     parser.add_argument('--enhancement', choices=('full', 'no_denoise', 'identity'), default='full')

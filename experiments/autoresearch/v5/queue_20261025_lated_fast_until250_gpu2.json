@@ -1,0 +1,32 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "User prioritizes completing LATeD250. Same batch10 and all eight healthy3900 training states; authorize fraction.80 and retain DSConv activations for measured speedup. CTW and Reading baselines untouched.",
+  "jobs": [
+    {
+      "id": "LATeD_resume3900_until250",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--config",
+        "results/v5/runtime/lated_geometry_fast_20261025/target.json",
+        "--allow-reduced-data",
+        "--resume",
+        "results/v5/detection/LATeD_geometry_fast_20261025/last.pt"
+      ],
+      "report": "results/v5/detection/LATeD_geometry_fast_20261025/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261025_LATeD_fast_until250.log",
+      "timeout_seconds": 604800
+    }
+  ]
+}

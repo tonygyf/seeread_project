@@ -1,0 +1,107 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json",
+  "scope": "GPU2 dedicated to finishing LATeD250. After current CTW250 completes, exactly resume healthy Reading LoRA last to8468 and evaluate one-factor hull candidate vs original crop on fixed weights/dev. No test.",
+  "jobs": [
+    {
+      "id": "Read_connector_LoRA_resume_after_CTW",
+      "argv": [
+        "python",
+        "tools/v5_adapt_reading.py",
+        "--output",
+        "results/v5/fusion/read_connector_lora_20261025",
+        "--resume",
+        "results/v5/fusion/read_connector_lora_20261025/last.pt",
+        "--max-steps",
+        "8468",
+        "--max-seconds",
+        "0"
+      ],
+      "report": "results/v5/fusion/read_connector_lora_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_read_connector_resume_gpu3.log",
+      "timeout_seconds": 21600
+    },
+    {
+      "id": "connector_mlt100",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/MLT17_dsconv_fp32/last.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_mlt100_read_lora_long_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_mlt100_read_lora_long_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_mlt100_read_long.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "connector_mlt100_hull",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/MLT17_dsconv_fp32/last.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_mlt100_hull_read_lora_long_20261025",
+        "--sampling",
+        "boundary_with_hull_fallback",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_mlt100_hull_read_lora_long_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_mlt100_hull_read_long.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "connector_lated41",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/LATeD_dsconv_fp32/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_lated41_read_lora_long_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_lated41_read_lora_long_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_lated41_read_long.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "connector_lated41_hull",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/LATeD_dsconv_fp32/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_lated41_hull_read_lora_long_20261025",
+        "--sampling",
+        "boundary_with_hull_fallback",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_lated41_hull_read_lora_long_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_lated41_hull_read_long.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

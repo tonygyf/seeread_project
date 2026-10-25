@@ -1,0 +1,24 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Independent connector crop-domain LoRA pilot, frozen R4 enhancer, fixed train/dev scene split; no official tests",
+  "jobs": [
+    {
+      "id": "connector_read_lora_pilot",
+      "argv": [
+        "python",
+        "tools/v5_adapt_reading.py",
+        "--output",
+        "results/v5/fusion/read_connector_lora_20261025",
+        "--max-steps",
+        "1200",
+        "--max-seconds",
+        "1200"
+      ],
+      "report": "results/v5/fusion/read_connector_lora_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_read_lora_pilot.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

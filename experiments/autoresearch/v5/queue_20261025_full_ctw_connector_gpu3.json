@@ -1,0 +1,49 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/queue_20261025_ctw_then_read_connector_gpu3.json",
+  "scope": "After CTW250 and Read long complete, verify same crop/decoder with complete CTW target checkpoint and original/adapted Reading; frozen dev only, no official test.",
+  "jobs": [
+    {
+      "id": "full_CTW250_R4",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/CTW1500_dsconv_fp32/best.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_ctw250_R4_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_ctw250_R4_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_ctw250_R4.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "full_CTW250_adapted",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/CTW1500_dsconv_fp32/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_ctw250_adapted_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_ctw250_adapted_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_ctw250_adapted.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

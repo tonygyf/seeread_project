@@ -1,0 +1,49 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/fusion/read_connector_lora_20261025/run.json",
+  "scope": "Paired fixed-detector evaluation of crop-domain LoRA pilot on complete bright/dark dev; official tests deferred",
+  "jobs": [
+    {
+      "id": "mlt100_read_lora_short",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/MLT17_dsconv_fp32/last.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_mlt100_read_lora_short_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_mlt100_read_lora_short_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_mlt100_read_lora_short.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "lated41_read_lora_short",
+      "argv": [
+        "python",
+        "tools/v5_eval_connector.py",
+        "--detector",
+        "results/v5/detection/LATeD_dsconv_fp32/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_lated41_read_lora_short_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_lated41_read_lora_short_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_connector_lated41_read_lora_short.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

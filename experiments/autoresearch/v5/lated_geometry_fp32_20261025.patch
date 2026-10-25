@@ -1,0 +1,48 @@
+--- a/seeread/v5/seeing.py
++++ b/seeread/v5/seeing.py
+@@ -115,7 +115,7 @@
+             paper='https://arxiv.org/html/2404.08965v3',
+             backbone='torchvision ResNet50 IMAGENET1K_V2' if pretrained else 'random ResNet50 sanity only',
+             channels=channels, output_stride=4, scm_stride=16,
+-            precision=dict(center_head='float32', text_head='float32', pm_conv_bn='float32'),
++            precision=dict(center_head='float32', text_head='float32', pm_conv_bn='float32', geometry_head='float32'),
+             attention=dict(axis='channel', activation='relu', scale='sqrt(spatial_locations)',
+                            accumulation_dtype='float32', heads=1, learned_temperature=False, residual=False),
+             assumptions=['three PM stages at stride16/8/4', 'two-axis DSC concat and 1x1 projection',
+@@ -151,10 +151,11 @@
+                 scm_input = f
+                 f = self.semantic_adapter(f)
+                 semantic = f
+-        geometry = self.geometry_head(f)
+         # Both classification convolutions exceeded FP16 range before BN
+         # normalization on real SynthText batches (steps28860/32962).
+         with torch.autocast(image.device.type, enabled=False):
++            # Real LATeD step3776 overflows the geometry convolution before BN.
++            geometry = self.geometry_head(f.float())
+             text_logits = self.text_head(f.float())
+             center_logits = self.center_head(f.float())
+         out = dict(text=text_logits, center=center_logits,
+--- a/tests/v5/test_v5_seeing.py
++++ b/tests/v5/test_v5_seeing.py
+@@ -30,7 +30,7 @@
+
+     def test_classification_heads_stay_finite_when_convolution_exceeds_fp16_range(self):
+         torch.set_num_threads(1)
+-        for name in ('center', 'text'):
++        for name in ('center', 'text', 'geometry'):
+             with self.subTest(head=name):
+                 torch.manual_seed(4)
+                 model = SeeingDetector(channels=4, pretrained=False, dsconv_factory=FakeDSConv).train()
+@@ -40,9 +40,10 @@
+                 with torch.no_grad():
+                     head[0][0].weight.fill_(50000.)
+                 image = torch.rand(2, 3, 64, 96)
+-                reference = model(image)[name].detach()
++                output = 'height' if name == 'geometry' else name
++                reference = model(image)[output].detach()
+                 with torch.autocast('cpu', dtype=torch.float16):
+-                    prediction = model(image)[name]
++                    prediction = model(image)[output]
+                 self.assertTrue(torch.isfinite(prediction).all())
+                 torch.testing.assert_close(prediction.float(), reference, rtol=.05, atol=.05)
+                 prediction.float().square().mean().backward()

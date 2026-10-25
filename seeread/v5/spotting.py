@@ -1,7 +1,7 @@
 """Unbenchmarked V5 composition: Seeing polygons -> native crop -> Reading.
 
 This inference adapter never loads legacy checkpoints, runs TSR centerlines, or
-uses split_polygon/minAreaRect. Geometry assumes one PCA cross-section per word
+uses split_polygon/minAreaRect. Default geometry assumes one PCA cross-section per word
 (no principal-axis fold). Reading direction is canonical +X for horizontal and
 +Y for vertical words; polygons alone cannot determine 180-degree text direction
 or arbitrary vertical-language order. These are explicit baseline limitations.
@@ -96,11 +96,17 @@ def _rectify_boundaries(image, centers, top, bottom, output_hw, pad):
 
 def _polygon_crop(image, polygon, output_hw=(384, 384), center_points=32, pad=1., min_mean_height=1.,
                   sampling='local_normal'):
-    if sampling == 'boundary_when_supported':
+    if sampling in ('boundary_when_supported', 'boundary_with_hull_fallback'):
         result = _polygon_crop(image, polygon, output_hw, center_points, pad, min_mean_height, 'polygon_boundary')
         if result.reason == 'multiple_cross_sections':
             result = _polygon_crop(image, polygon, output_hw, center_points, pad, min_mean_height, 'local_normal')
             result.sampling = 'local_normal'
+            result.fallback_reason = 'multiple_cross_sections'
+        if result.reason == 'multiple_cross_sections' and sampling == 'boundary_with_hull_fallback':
+            # Retain the whole failed outline; the explicit candidate includes its concavities as background.
+            hull = cv2.convexHull(np.asarray(polygon, np.float32)).reshape(-1, 2)
+            result = _polygon_crop(image, hull, output_hw, center_points, pad, min_mean_height, 'polygon_boundary')
+            result.sampling = 'convex_hull_boundary'
             result.fallback_reason = 'multiple_cross_sections'
         return result
     if sampling not in ('local_normal', 'polygon_boundary'):
@@ -173,6 +179,8 @@ def polygon_crop(image, polygon, output_hw=(384, 384), center_points=32, pad=1.,
     the polygon-derived strip; any added padding is an explicit later ablation.
     polygon_boundary samples the actual cross-section edges; local_normal
     preserves the original symmetric centerline strip for controlled comparison.
+    boundary_with_hull_fallback includes concavities as background only when
+    both original strategies reject multiple cross-sections.
     Outside-image polygons are reported invalid rather than silently clipped.
     """
     return _polygon_crop(_image(image), polygon, output_hw, center_points, pad, min_mean_height, sampling)

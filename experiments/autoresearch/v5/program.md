@@ -4,7 +4,7 @@
 
 1. 固定train/dev/test、暗化种子、CER归一化与spotting匹配规则；dev选模，锁定后才做官方test验收；ESTR60最终留用。
 2. 新实验独立公共初始化、新输出目录；exact resume须同源码、运行库、数据与配方，保留optimizer/scaler/RNG/sampler。不得迁入旧S3/S4权重。
-3. 已授权同时使用物理GPU2和GPU3，每卡独立受限容器、每卡串行一项训练；各24GiB/8CPU/512PID、shm4GiB、无额外swap，显存比例0.35。监控只查询本卡，外部负载时等待或中断经身份核验的自有任务，不碰其他进程与共享服务。
+3. 已授权同时使用物理GPU2和GPU3，每卡独立受限容器、每卡串行一项训练；各24GiB/8CPU/512PID、shm4GiB、无额外swap，默认显存比例0.35；用户2026-10-25新增授权GPU2独立LATeD加速副本0.80。监控只查询本卡，外部负载时等待或中断经身份核验的自有任务，不碰其他进程与共享服务。
 4. 短程1200秒，报告实际更新数、样本和验证耗时。仅完整dev参与keep/discard；方法候选获开发收益后才扩预算。R4b长程门槛为比冻结R1同dev raw CER改善至少1个百分点。
 5. 固定论文阶段按预登记目标执行：SynthText2epoch→MLT17 100epoch→目标集250epoch；20分钟数值/资源检查通过后，按已授权的单卡不限时完成，正式配置max_seconds=0。整epoch前无dev，不以train loss下降代替泛化收益。
 6. 非有限loss/FP32梯度或连续AMP失败超额即停止；AMP重试不推进sampler/scheduler，成功清零streak；异常快照不覆盖健康last。
@@ -32,3 +32,7 @@
 19. 固定Syn109600/R4best connector完整dev对照已完成。直接boundary在预测多截面轮廓上退化；仅此失败显式采用原local_normal并记录策略/原因的boundary_when_supported，经独立真实推理及200图框/分数/顺序同一性核验，得到亮光F1+1.3699pp、暗光+0.7344pp（暗光区间跨0）。候选不替换正式基线。该次计划queue_20261023_connector_supported_then_ctw_gpu3.json已完成connector并进入CTW等待，后续队列见docs04。
 
 20. 用户2026-10-24要求继续connector，官方检测评测与终测后置。Seeing153502的DSConv卷积FP16溢出已原批复现，使用局部conv/GN FP32及纯算子激活重算，通过原批完整更新后，从健康153400显式迁移八项状态至独立dsconv目录，继续原2/100/250预算。connector109600快照也另存数值迁移副本，保持严格加载检查；新none对照逐图框/分数/文字/指标与旧pad1.1完全一致，再测只由crop像素决定的p95曝光。候选效果、当前队列和证据统一见docs04；不改默认基线或使用test挑选。
+
+21. 2026-10-25：共享MLT100完成，CTW目标训练继续；LATeD3776的geometry Conv FP16溢出已原批重放。为保持活动CTW闭包，数值修复先在results/v5/runtime/lated_geometry_fp32_20261025独立副本执行，记录补丁、MLT等权重副本和LATeD健康3690八项状态迁移，继续原250轮。新增融合Read裁剪域适配：固定R4增强器，仅训练原LoRA；使用冻结TotalText train场景及修正候选转写，按原图隔离100对dev和test，1:1亮/合成暗裁剪，条件边界/pad1.1与推理一致。短程最多1200秒/1200步、每200步完整暗光dev选模；正式同冻结MLT和LATeD快照复核明暗spotting。扩预算要求暗光GT CER下降至少1pp、暗光spotting不退化，并监测亮光F1退化不超过1pp；不使用任何test，不把域适配覆盖独立R4基线。
+
+22. 用户2026-10-25要求LATeD优先跑完、利用显存提速。GPU2独占LATeD geometry-fast分支至250轮（无短程上限），batch10不变，显存比例.80、保留DSConv激活；真实四次更新对照后迁移健康3900八项状态。GPU3继续原CTW至250，随后原样恢复Read健康last至总8468更新，并在固定MLT/LATeD权重上对照正常条件边界与仅失败轮廓的凸包候选；未获收益前不改变默认connector。Read短程的原图实测暗光CER−4.1237pp、固定MLT框暗光F1持平，满足第21条扩预算门槛；独立R4及终测继续封存。

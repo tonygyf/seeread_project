@@ -1,6 +1,6 @@
 # 04 v5 论文对齐与实验状态
 
-更新：2026-10-24 20:50（北京时间）。**Reading锁定LSTR test CER49.5191%，与论文50.02%差−0.5009个百分点。Seeing的SynthText 2轮已完成（171750步），GPU2现训练MLT17，完成28/100轮（20160/72000步）；GPU3等待共享MLT后训练CTW。当前connector裁剪开发对照已完成；完整See上的融合复核、裁剪域微调、重训消融和终测尚待开展，官方检测评测与终测继续后置。**
+更新：2026-10-25 15:01（北京时间）。**Reading锁定LSTR test CER49.5191%，独立基线保留。SynthText2轮和MLT100轮完成。GPU2从健康LATeD step3900续训至250轮：geometry head FP32、保留DSConv激活、显存上限80%，当前超过48轮；GPU3 CTW超过210/250轮。Read裁剪域短程已确认暗光GT CER68.9464%→64.8227%，长程健康点保留，健康step2400已通过GPU3续训协议预检，排在CTW结束后由GPU3继续。官方检测评测与终测继续后置。**
 
 ## 1. 识别：完整测试结果与论文差距
 
@@ -42,15 +42,15 @@
 
 | 任务 | 当前进度 | 后续 |
 |---|---|---|
-| GPU2 / SynthText | 全量858750图、batch10；已完成171750/171750更新、2/2 epoch；状态stage_complete | 已进入MLT，SynthText健康末权重保留 |
-| MLT17 | **已完成28/100轮、20160/72000更新**；train7200/dev1795，正常训练 | 已继承完整SynthText；结束后进入目标训练 |
-| LATeD目标阶段 | 未开始，900train×250轮=22500更新 | 自动继承MLT；dev100选模，锁定后test500 |
-| CTW目标阶段 / GPU3 | 已验证900train/100dev、250轮、batch10；后台等待完整MLT | 与GPU2 LATeD并行，共用同一MLT父权重；正式test仍待锁定GT版本与官方评测 |
-| Reading / GPU3 | 两支20轮、三组LSTR验收及同权重移除诊断完成；本轮两组检测dev推理完成 | GPU3已完成裁剪/余量/曝光/增强移除对照，当前恢复CTW等待；完整MLT后自动训练CTW |
+| SynthText | 已完成2轮、171750更新 | 健康末权重已用于MLT |
+| MLT17 | **已完成100轮、72000更新**；train7200/dev1795 | LATeD和CTW共享同一完整父权重 |
+| LATeD / GPU2 | 原链41轮后溢出；修复后健康3900已恢复，当前超过48轮；原最佳内部dev F1 **51.3750%**（epoch38） | `LATeD_geometry_fast_20261025`，batch10、无短程上限，续满250轮 |
+| CTW / GPU3 | 已超过210/250轮；原闭包继续 | 完成后自动承接Read长程和连接单因素对照；最佳值以events为准 |
+| Read / connector | R2/R4独立训练和LSTR验收完成；新增完整MLT、LATeD阶段连接诊断 | 固定增强器、仅LoRA做裁剪域适配；不覆盖独立R4 |
 
-MLT已完整接入并实际训练至28轮。该轮完整MLT dev1795的内部Precision/Recall/F1为55.7404/39.7504/46.4067%；属于MLT自身开发指标，不与LATeD/CTW分数直接比较，也不能单凭它判定MLT的因果增益。它服务于Seeing检测预训练；Reading按LSTR训练，不额外喂MLT。MLT的因果收益留待同一完整SynthText起点、相同目标训练预算的有/无MLT对照。
+MLT末轮dev内部P/R/F1为54.5029/40.0639/46.1811%，最佳F1为51.9490%（epoch82）。它已完整用于两个目标检测分支；不同检测checkpoint的域迁移结果见§4，不把跨阶段差值称为MLT因果收益。MLT未加入独立Reading训练。
 
-双卡加速采用共享完整预训练、并行目标训练：GPU2执行SynthText→MLT→LATeD，GPU3只读等待完整MLT后执行CTW。共享预训练目录仅由GPU2写入；上游未完成或异常时不启动CTW。沿用原训练器与batch10，未加入DDP或改变当前续训状态，因此前置SynthText/MLT耗时不减半，两个目标阶段不再串行。分支与训练测试11项、宿主队列安全测试14项通过，配置/数据预检通过；两路复核无遗留发现。
+双卡沿用每卡独立容器和串行任务。GPU3继续原CTW训练；GPU2已恢复LATeD长程并优先续满250轮；Read短程及复核完成，追加长程中断前的健康last保留，由GPU3在CTW后接续。共享预训练只读，未加入DDP；正式评测仍后置。
 
 Seeing论文test F1目标LATeD/CTW/TotalText为67.1/86.2/88.5%，见[Table2/3](https://arxiv.org/html/2404.08965v3)。当前阶段dev F1不替代这三项正式成绩。
 
@@ -83,7 +83,7 @@ Seeing论文test F1目标LATeD/CTW/TotalText为67.1/86.2/88.5%，见[Table2/3](h
 | Seeing结构 | ResNet50 ImageNetV2、256ch、DSF/官方DSConv pro、SCM/TSR；算子前向与梯度核验通过 | SCM布局、注意力轴、双轴融合及几何是重实现假设；完整作者代码未取得 |
 | Seeing测试尺寸 | 论文§5.1：LATeD/CTW640×640，TotalText640×1200，MSRA640×960；本次LATeD/CTW开发尺寸对应 | 正式TotalText验收另设1200宽协议；当前640方图融合开发不冒充正式TotalText基线 |
 | Seeing配方 | SynthText2→MLT100→目标250，Adam1e-4/batch10/每100轮×0.1；补齐scale/crop/color/noise/flip/rotate | 增强概率、scale[.75,1.5]、stretch/仿射顺序及目标250时长为登记解释 |
-| MLT17 | 全11ZIP校验、9000图全解码/GT配对；train7200/dev1795；5验证副本隔离、4单帧GIF保留源并转无损PNG | 已训练28/100轮；压缩包校验后已安全清理，解压数据保留 |
+| MLT17 | 全11ZIP校验、9000图全解码/GT配对；train7200/dev1795；5验证副本隔离、4单帧GIF保留源并转无损PNG | 已完成100/100轮；压缩包校验后已安全清理，解压数据保留 |
 | SynthText / LATeD | SynthText858750路径非空、清单摘要匹配；LATeD900/100/500，无转写 | LATeD全train1000 refit未做；暂无真实暗光spotting真值 |
 | CTW1500 | MMOCR train1000/7703实例保留坐标；冻结900/100。镜像test3075实例/387ignore；另存作者检测候选test3068实例 | 训练/测试图像已齐、可继续实验；两源67图测试几何不同，待锁定标注版本与官方评测；不要求另下载整套训练图 |
 | Total-Text | 新train-only候选1255图/10579实例/1294ignore；按作者第6列orientation判定ignore，修复6处旧候选错误；10个单点ignore单列 | 候选未采用，冻结训练/测试及现融合均未改；当前融合100图无真实ignore差异，1个单点过滤已登记 |
@@ -182,22 +182,55 @@ pad1.1表示展开高度增加10%，上下各留原高度5%；相对于pad1的�
 
 当前并行推进connector在固定快照上的裁剪、暗光适配与逐实例调试；官方检测评测接入和终测统一后置。完整目标检测权重上的正式融合验收、重训消融、多种子及真实低光终测尚未完成；RLLIE也未实现。正式结论需要完整基线，开发验证不再把等待See作为前置条件。
 
+### 2026-10-25：完整MLT、目标域迁移与Read裁剪适配
+
+固定R4 best、条件轮廓裁剪/pad1.1、同100对开发图；只更换检测权重，未用test。
+
+| 检测权重 | 亮光检测F1% | 暗光检测F1% | 暗光检测Recall% | 亮光spotting F1% | 暗光spotting F1% |
+|---|---:|---:|---:|---:|---:|
+| 原SynthText109600 | 33.5616 | 9.7919 | 5.5021 | 15.5822 | 5.6304 |
+| 完整MLT100末权重 | 44.3206 | 6.7669 | 3.7139 | 20.7666 | 4.2607 |
+| LATeD前41轮开发集best（epoch38） | 9.9562 | 14.8936 | 10.5915 | 2.7352 | 4.0619 |
+
+三组GT-crop CER相同（亮18.8081%、暗68.9464%），因为Read和裁剪图不变。MLT预训练的亮光泛化提高，不能据此声称低光spotting提升；LATeD提高暗光命中却增加误检，检测命中后读对比例27.27%。LATeD暗光309个原始预测中48个裁剪多截面失败、54个有覆盖多个GT的合并候选；这些是诊断计数，不用GT修正实际推理。完整结果：[MLT](../results/v5/fusion/connector_mlt100_20261025/run.json)、[LATeD](../results/v5/fusion/connector_lated41_20261025/run.json)、[实例关联审计](../results/v5/diagnostics/connector_detector_transfer_20261025.json)。不同目标域的检测分数不代替最终完整权重验收。
+
+因此本轮先保留几何策略与增强器，建立独立裁剪域LoRA训练线：从R4 best初始化，固定Self-DACE，仅优化原TrOCR LoRA；训练图使用冻结TotalText train的1152张原图、修正候选转写，生成16934张亮暗训练词图，训练原图与100对dev/test做路径和字节隔离，亮/合成暗1:1。通过实际connector生成384×384裁剪；PNG量化只用于训练/选模，完整spotting复核仍用原图浮点裁剪，并包含几何失败词。训练属于融合适配，不改独立LSTR基线，也不把该候选标注版本称为官方复现。短程已完成1200步；723张有效暗光dev PNG选模CER从71.6919%降至64.6970%（step800最佳）。PNG量化与直接浮点裁剪的输入不同，不将这组数值与先前68.9464%直接相减；已完成同检测框、原图浮点裁剪的明暗spotting复核，见下表。4个无效GT裁剪在完整复核中继续保留CER分母。
+
+| 固定检测器；仅替换Read LoRA | 亮光GT CER%↓ | 暗光GT CER%↓ | 亮光spotting F1%↑ | 暗光spotting F1%↑ |
+|---|---:|---:|---:|---:|
+| MLT100 + 原R4 | 18.8081 | 68.9464 | 20.7666 | 4.2607 |
+| MLT100 + 裁剪适配短程best800 | **14.0558** | **64.8227** | **21.4634** | 4.2607 |
+| LATeD epoch38 + 原R4 | 18.8081 | 68.9464 | 2.7352 | 4.0619 |
+| LATeD epoch38 + 同适配best800 | **14.0558** | **64.8227** | **3.1729** | **4.4487** |
+
+暗光CER差−4.1237pp，按原图配对bootstrap95%区间[−5.9034,−2.4282]pp；LATeD框下暗光F1差+0.3868pp，区间[−0.3543,+1.1930]pp跨0。识别改善有证据，端到端增益尚待完整检测权重复核。亮光CER差−4.7523pp；固定MLT框的亮光F1差+0.6969pp，区间跨0。逐项核验只有144个LoRA张量变化，增强器与其他全部张量逐位相同，原R4文件不变。[短程权重审计](../results/v5/fusion/read_connector_lora_20261025/short_weight_audit.json)；稳定快照`short_best.pt`；[MLT复核/配对统计](../results/v5/fusion/connector_mlt100_read_lora_short_20261025/paired_comparison.json)、[LATeD复核/配对统计](../results/v5/fusion/connector_lated41_read_lora_short_20261025/paired_comparison.json)。
+
+短程达到预登记扩预算条件：暗光CER改善≥1pp、暗光spotting不降、亮光F1退化≤1pp。长程总预算8468更新（16934词图、batch4、两遍），已从短程接续；用户随后要求优先跑完LATeD，Read暂停在最新健康last，排队到GPU3 CTW后继续，不从头训练。新connector候选仅对原策略仍失败的`multiple_cross_sections`使用凸包边界，正常裁剪不变，并记录`convex_hull_boundary`；CPU连接回归21项通过，实际同权重对照排在Read长程后，在取得增益证据前不替换保留方案。
+
+LATeD本轮故障为geometry head首卷积有限输入→FP16 Inf→BN NaN。相同批BF16/FP32有限；仅geometry head FP32后，真实完整更新loss2.03157、grad norm8.66608、参数全有限，峰值allocated20.96GiB/reserved23.10GiB。[失败批重放](../results/v5/diagnostics/lated_failed3776_20261025.json) / [反向验证](../results/v5/diagnostics/lated_failed3776_backward_green_20261025.json)。为保留运行中的CTW闭包，修复在独立代码副本`results/v5/runtime/lated_geometry_fp32_20261025/`，[补丁](../experiments/autoresearch/v5/lated_geometry_fp32_20261025.patch)包含源码与回归用例；主目录Seeing未变。新LATeD从健康step3690迁移，model/optimizer/scheduler/scaler/RNG/sampler/loader/state八项保持，MLT初始化另存等权重且拓扑一致的副本。恢复已原序重放失败批、到健康step3900，参数全有限且源码吻合；迁移记录分别在两新检测目录的`numeric_migration.json`。补丁待CTW结束后统一合入，不能把跨源码迁移称作原闭包exact resume。
+
+GPU2加速遵照用户新增授权，原batch10和250轮预算保持：同一健康3900批次，原重算稳定均值0.7742秒/步，保留激活0.6911秒/步，吞吐约+12.0%；峰值allocated20.97→34.58GiB，全部参数有限，首个loss相同。减少重算后的浮点梯度有正常数值差异，不称逐位相同训练轨迹。[重算对照](../results/v5/diagnostics/lated_recompute_benchmark_20261025.json) / [保留激活对照](../results/v5/diagnostics/lated_no_recompute_benchmark_20261025.json)。独立副本`lated_geometry_fast_20261025`同时保留几何头FP32修复；内存上限由.35授权为.80，容器RAM24GiB/CPU8/PID512不变，主目录CTW闭包未改；独立加速副本回归20项及5个子测试通过。从健康3900迁移全部八项状态，最佳epoch38也迁移保留；不使用interrupted.pt续训。[加速补丁](../experiments/autoresearch/v5/lated_no_recompute_20261025.patch)、新目录`numeric_migration.json`与`best_migration.json`记录来源。最初启动被旧.35硬限制挡住，调整授权副本后已实际运行，不把失败尝试记为训练完成。
+
 ## 5. 运行和证据入口
 
 | 内容 | 位置 |
 |---|---|
-| 检测新计划/状态 | [DSConv精度恢复计划](../experiments/autoresearch/v5/queue_20261024_detection_dsconv_fp32.json) / [实时状态](../results/v5/queue_20261024_detection_dsconv_fp32.json)；旧中断队列保留 |
-| 检测训练 | `results/v5/detection/SynthText_dsconv_fp32_20261024/` → `MLT17_dsconv_fp32/` → `LATeD_dsconv_fp32/`；日志 `results/v5/queue_logs/20261024_Seeing_dsconv_fp32_full_chain.log` |
-| GPU3 CTW并行分支 | [当前计划](../experiments/autoresearch/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json) / [当前状态](../results/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json)；connector对照已完成、当前只读等待，日志 `results/v5/queue_logs/20261024_CTW_after_no_denoise_verified_gpu3.log`，完成后输出`results/v5/detection/CTW1500_dsconv_fp32/` |
+| 检测旧主链/状态 | [DSConv精度恢复计划](../experiments/autoresearch/v5/queue_20261024_detection_dsconv_fp32.json) / [实时状态](../results/v5/queue_20261024_detection_dsconv_fp32.json)；MLT完成、LATeD3776中断，恢复见新记录 |
+| LATeD当前长程 | [授权加速计划](../experiments/autoresearch/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json) / [实时状态](../results/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json)；`LATeD_geometry_fast_20261025`，无短程上限 |
+| GPU3后续Read/connector | [CTW后续计划](../experiments/autoresearch/v5/queue_20261025_ctw_then_read_connector_gpu3.json) / [状态](../results/v5/queue_20261025_ctw_then_read_connector_gpu3.json)；等待当前CTW完成后继续Read8468与凸包候选对照；随后[完整CTW连接复核](../experiments/autoresearch/v5/queue_20261025_full_ctw_connector_gpu3.json) |
+| LATeD数值恢复 | [短程计划](../experiments/autoresearch/v5/queue_20261025_lated_geometry_preflight.json) / [状态](../results/v5/queue_20261025_lated_geometry_preflight.json)；`LATeD_geometry_fp32_20261025`，原失败记录保留 |
+| Read裁剪域适配 | [短程计划](../experiments/autoresearch/v5/queue_20261025_connector_read_lora_pilot.json)；输出`results/v5/fusion/read_connector_lora_20261025/` |
+| 检测原主链 | `results/v5/detection/SynthText_dsconv_fp32_20261024/` → `MLT17_dsconv_fp32/` → `LATeD_dsconv_fp32/`；日志 `results/v5/queue_logs/20261024_Seeing_dsconv_fp32_full_chain.log` |
+| GPU3 CTW并行分支 | [当前计划](../experiments/autoresearch/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json) / [当前状态](../results/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json)；connector对照已完成、当前CTW目标训练中，日志 `results/v5/queue_logs/20261024_CTW_after_no_denoise_verified_gpu3.log`，完成后输出`results/v5/detection/CTW1500_dsconv_fp32/` |
 | 识别训练 | [GPU3计划](../experiments/autoresearch/v5/queue_20261022_reading_gpu3.json) / [实时状态](../results/v5/queue_20261022_reading_gpu3.json)；`results/v5/reading/R0str_frozen/、R2str_lora/、R4str_joint/` |
 | 识别锁定验收 | [后续计划](../experiments/autoresearch/v5/queue_20261022_reading_acceptance_gpu3.json) / [状态](../results/v5/queue_20261022_reading_acceptance_gpu3.json)；三组锁定官方LSTR测试均完成 |
 | 来源/规则 | `results/v5/source_snapshots/`；Self-DACE ec0c033、DSCNet0e35b2b；[执行规则](../experiments/autoresearch/v5/program.md)、[结果索引](../experiments/autoresearch/v5/results.tsv) |
 
-仅使用物理GPU2/3，每卡独立容器、各RAM24GiB/无额外swap、CPU8/PID512/shm4GiB/线程4/显存比例.35；外部负载出现时只让出自己的任务。队列14项安全测试通过。控制器已脱离SSH会话，断开SSH可继续；服务器/Docker重启后须显式恢复。Reading训练闭包未改，ESTR60未使用。日志/events是实时进度，status.json在调用退出时更新；健康last才是恢复点。历史结果与旧实现结论见03，不在本篇重复展开。
+仅使用物理GPU2/3，每卡独立容器、各RAM24GiB/无额外swap、CPU8/PID512/shm4GiB/线程4/默认显存比例.35；本次用户授权GPU2加速副本.80；外部负载出现时只让出自己的任务。队列14项安全测试通过。控制器已脱离SSH会话，断开SSH可继续；服务器/Docker重启后须显式恢复。Reading训练闭包未改，ESTR60未使用。日志/events是实时进度，status.json在调用退出时更新；健康last才是恢复点。历史结果与旧实现结论见03，不在本篇重复展开。
 
 ## 6. 到投稿的剩余工作与时间估计
 
-本轮Reading官方test已完成；后续进度瓶颈为完整检测与组合实验。SynthText已完成；MLT最近5轮均值约674秒/轮（包含验证），余72轮约13.5小时；LATeD/CTW随后并行各约6–9小时，当前排队检测训练预计还需约19–24小时，约10月25日下午至晚上。目标阶段速度尚需实测，不包含后续融合重训、消融和终测。CTW目标训练将与LATeD并行，正式评测对齐另计。
+Reading官方test与完整MLT已完成。当前CTW还约1小时，完成后Read剩余长程与连接复核约20–40分钟；LATeD新加速分支还约4.5–5小时，按当前速度约10月25日晚间结束。预算是续满250轮，不以短程时间停止；正式评测、多种子和终测另计。
 
 | 剩余步骤 | 交付证据 | 粗估时间 |
 |---|---|---|

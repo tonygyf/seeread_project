@@ -120,3 +120,23 @@ def test_supported_boundary_strategy_records_geometric_fallback_only():
     assert torch.equal(good.crop, polygon_crop(image, straight, sampling='polygon_boundary').crop)
     bad = polygon_crop(image, [[-1,0],[10,0],[10,10]], sampling='boundary_when_supported')
     assert bad.reason == 'polygon_outside_image' and bad.fallback_reason is None
+
+
+def test_hull_candidate_recovers_failed_outline_and_preserves_supported_crops():
+    image = coordinate_image()
+    folded = [[20,20],[180,20],[180,50],[60,50],[60,80],[180,80],[180,110],[20,110]]
+    assert polygon_crop(image, folded, sampling='boundary_when_supported').reason == 'multiple_cross_sections'
+    recovered = polygon_crop(image, folded, sampling='boundary_with_hull_fallback')
+    assert recovered.reason is None and recovered.sampling == 'convex_hull_boundary'
+    assert recovered.fallback_reason == 'multiple_cross_sections'
+    xy = recovered.crop[0, :2].numpy() * np.array([399, 239])[:, None, None]
+    assert xy[0].min() == pytest.approx(20, abs=.01)
+    assert xy[0].max() == pytest.approx(180, abs=.01)
+    assert xy[1].min() == pytest.approx(20, abs=.01)
+    assert xy[1].max() == pytest.approx(110, abs=.01)
+    straight = [[20,20],[200,20],[200,50],[20,50]]
+    old = polygon_crop(image, straight, sampling='boundary_when_supported')
+    new = polygon_crop(image, straight, sampling='boundary_with_hull_fallback')
+    assert torch.equal(old.crop, new.crop) and new.fallback_reason is None
+    bad = polygon_crop(image, [[-1,0],[10,0],[10,10]], sampling='boundary_with_hull_fallback')
+    assert bad.reason == 'polygon_outside_image' and bad.fallback_reason is None
