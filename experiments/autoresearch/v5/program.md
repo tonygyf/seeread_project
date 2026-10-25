@@ -36,3 +36,5 @@
 21. 2026-10-25：共享MLT100完成，CTW目标训练继续；LATeD3776的geometry Conv FP16溢出已原批重放。为保持活动CTW闭包，数值修复先在results/v5/runtime/lated_geometry_fp32_20261025独立副本执行，记录补丁、MLT等权重副本和LATeD健康3690八项状态迁移，继续原250轮。新增融合Read裁剪域适配：固定R4增强器，仅训练原LoRA；使用冻结TotalText train场景及修正候选转写，按原图隔离100对dev和test，1:1亮/合成暗裁剪，条件边界/pad1.1与推理一致。短程最多1200秒/1200步、每200步完整暗光dev选模；正式同冻结MLT和LATeD快照复核明暗spotting。扩预算要求暗光GT CER下降至少1pp、暗光spotting不退化，并监测亮光F1退化不超过1pp；不使用任何test，不把域适配覆盖独立R4基线。
 
 22. 用户2026-10-25要求LATeD优先跑完、利用显存提速。GPU2独占LATeD geometry-fast分支至250轮（无短程上限），batch10不变，显存比例.80、保留DSConv激活；真实四次更新对照后迁移健康3900八项状态。GPU3继续原CTW至250，随后原样恢复Read健康last至总8468更新，并在固定MLT/LATeD权重上对照正常条件边界与仅失败轮廓的凸包候选；未获收益前不改变默认connector。Read短程的原图实测暗光CER−4.1237pp、固定MLT框暗光F1持平，满足第21条扩预算门槛；独立R4及终测继续封存。
+
+23. 用户2026-10-25通过grill-me选择优先Read裁剪域长训。当前CTW250已完成；先完成已登记Read2及全部连接对照，再沿用相同优化器/学习率2e-5/batch4/数据/冻结增强器与LoRA，扩至5轮21170更新。5轮在同完整CTW权重、同crop/decoder源码及开发图上，相比2轮暗光原图GT CER改善≥1pp、暗光E2E F1不降、亮光F1退化≤1pp，才扩至10轮42340更新。每阶段快照best/last与报告；不改现有See250和独立LSTR基线，不运行官方test。计划queue_20261025_read_5to10_epochs_gpu3.json，容器GPU3顺序执行。

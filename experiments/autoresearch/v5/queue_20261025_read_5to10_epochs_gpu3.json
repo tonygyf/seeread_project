@@ -1,0 +1,41 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/queue_20261025_full_ctw_connector_gpu3.json",
+  "scope": "User selected priority Read crop adaptation. Finish current CTW250, Read2 and all paired connector evaluations first. Then preserve phase2, continue same optimizer/LR/batch to5, evaluate; only continue to10 if dark original-float GT CER improves>=1pp, dark E2E does not regress and bright E2E falls<=1pp relative to phase2, same fixed full CTW detector. No test; LATeD unchanged.",
+  "jobs": [
+    {
+      "id": "Read_LoRA_epoch05_controlled_extension",
+      "argv": [
+        "python",
+        "tools/v5_extend_reading.py",
+        "--epochs",
+        "5"
+      ],
+      "report": "results/v5/fusion/read_connector_lora_20261025/phase_epoch_05.json",
+      "acceptable_report_statuses": [
+        "complete",
+        "skipped_no_development_gain"
+      ],
+      "log": "results/v5/queue_logs/20261025_read_epoch05_extension.log",
+      "timeout_seconds": 43200
+    },
+    {
+      "id": "Read_LoRA_epoch10_controlled_extension",
+      "argv": [
+        "python",
+        "tools/v5_extend_reading.py",
+        "--epochs",
+        "10"
+      ],
+      "report": "results/v5/fusion/read_connector_lora_20261025/phase_epoch_10.json",
+      "acceptable_report_statuses": [
+        "complete",
+        "skipped_no_development_gain"
+      ],
+      "log": "results/v5/queue_logs/20261025_read_epoch10_extension.log",
+      "timeout_seconds": 43200
+    }
+  ]
+}

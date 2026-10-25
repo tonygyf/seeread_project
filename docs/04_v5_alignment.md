@@ -1,6 +1,6 @@
 # 04 v5 论文对齐与实验状态
 
-更新：2026-10-25 15:01（北京时间）。**Reading锁定LSTR test CER49.5191%，独立基线保留。SynthText2轮和MLT100轮完成。GPU2从健康LATeD step3900续训至250轮：geometry head FP32、保留DSConv激活、显存上限80%，当前超过48轮；GPU3 CTW超过210/250轮。Read裁剪域短程已确认暗光GT CER68.9464%→64.8227%，长程健康点保留，健康step2400已通过GPU3续训协议预检，排在CTW结束后由GPU3继续。官方检测评测与终测继续后置。**
+更新：2026-10-25 15:59（北京时间）。**CTW目标训练已完成250轮/22500更新，内部dev best F1 55.0292%（epoch217），末轮52.8061%；GPU3已恢复Read裁剪域两轮训练。GPU2 LATeD约87/250轮，按原预算继续。用户选择优先检验Read多轮：现有两轮及全部连接对照完成后，保持同学习率/数据/模块接到5轮，满足开发门槛才到10轮；独立Read和See基线保留。官方评测与终测后置。**
 
 ## 1. 识别：完整测试结果与论文差距
 
@@ -45,12 +45,12 @@
 | SynthText | 已完成2轮、171750更新 | 健康末权重已用于MLT |
 | MLT17 | **已完成100轮、72000更新**；train7200/dev1795 | LATeD和CTW共享同一完整父权重 |
 | LATeD / GPU2 | 原链41轮后溢出；修复后健康3900已恢复，当前超过48轮；原最佳内部dev F1 **51.3750%**（epoch38） | `LATeD_geometry_fast_20261025`，batch10、无短程上限，续满250轮 |
-| CTW / GPU3 | 已超过210/250轮；原闭包继续 | 完成后自动承接Read长程和连接单因素对照；最佳值以events为准 |
+| CTW / GPU3 | **完成250/250轮、22500更新**；内部dev best F1 **55.0292%**（217轮），末轮52.8061% | 已交接GPU3给Read两轮与连接对照，后接5→10轮受控探查 |
 | Read / connector | R2/R4独立训练和LSTR验收完成；新增完整MLT、LATeD阶段连接诊断 | 固定增强器、仅LoRA做裁剪域适配；不覆盖独立R4 |
 
 MLT末轮dev内部P/R/F1为54.5029/40.0639/46.1811%，最佳F1为51.9490%（epoch82）。它已完整用于两个目标检测分支；不同检测checkpoint的域迁移结果见§4，不把跨阶段差值称为MLT因果收益。MLT未加入独立Reading训练。
 
-双卡沿用每卡独立容器和串行任务。GPU3继续原CTW训练；GPU2已恢复LATeD长程并优先续满250轮；Read短程及复核完成，追加长程中断前的健康last保留，由GPU3在CTW后接续。共享预训练只读，未加入DDP；正式评测仍后置。
+双卡沿用每卡独立容器和串行任务。GPU3已完成原CTW训练并恢复Read；GPU2已恢复LATeD长程并优先续满250轮；Read短程及复核完成，追加长程中断前的健康last保留，由GPU3在CTW后接续。共享预训练只读，未加入DDP；正式评测仍后置。
 
 Seeing论文test F1目标LATeD/CTW/TotalText为67.1/86.2/88.5%，见[Table2/3](https://arxiv.org/html/2404.08965v3)。当前阶段dev F1不替代这三项正式成绩。
 
@@ -207,9 +207,26 @@ pad1.1表示展开高度增加10%，上下各留原高度5%；相对于pad1的�
 
 短程达到预登记扩预算条件：暗光CER改善≥1pp、暗光spotting不降、亮光F1退化≤1pp。长程总预算8468更新（16934词图、batch4、两遍），已从短程接续；用户随后要求优先跑完LATeD，Read暂停在最新健康last，排队到GPU3 CTW后继续，不从头训练。新connector候选仅对原策略仍失败的`multiple_cross_sections`使用凸包边界，正常裁剪不变，并记录`convex_hull_boundary`；CPU连接回归21项通过，实际同权重对照排在Read长程后，在取得增益证据前不替换保留方案。
 
-LATeD本轮故障为geometry head首卷积有限输入→FP16 Inf→BN NaN。相同批BF16/FP32有限；仅geometry head FP32后，真实完整更新loss2.03157、grad norm8.66608、参数全有限，峰值allocated20.96GiB/reserved23.10GiB。[失败批重放](../results/v5/diagnostics/lated_failed3776_20261025.json) / [反向验证](../results/v5/diagnostics/lated_failed3776_backward_green_20261025.json)。为保留运行中的CTW闭包，修复在独立代码副本`results/v5/runtime/lated_geometry_fp32_20261025/`，[补丁](../experiments/autoresearch/v5/lated_geometry_fp32_20261025.patch)包含源码与回归用例；主目录Seeing未变。新LATeD从健康step3690迁移，model/optimizer/scheduler/scaler/RNG/sampler/loader/state八项保持，MLT初始化另存等权重且拓扑一致的副本。恢复已原序重放失败批、到健康step3900，参数全有限且源码吻合；迁移记录分别在两新检测目录的`numeric_migration.json`。补丁待CTW结束后统一合入，不能把跨源码迁移称作原闭包exact resume。
+LATeD本轮故障为geometry head首卷积有限输入→FP16 Inf→BN NaN。相同批BF16/FP32有限；仅geometry head FP32后，真实完整更新loss2.03157、grad norm8.66608、参数全有限，峰值allocated20.96GiB/reserved23.10GiB。[失败批重放](../results/v5/diagnostics/lated_failed3776_20261025.json) / [反向验证](../results/v5/diagnostics/lated_failed3776_backward_green_20261025.json)。为保留运行中的CTW闭包，修复在独立代码副本`results/v5/runtime/lated_geometry_fp32_20261025/`，[补丁](../experiments/autoresearch/v5/lated_geometry_fp32_20261025.patch)包含源码与回归用例；主目录Seeing未变。新LATeD从健康step3690迁移，model/optimizer/scheduler/scaler/RNG/sampler/loader/state八项保持，MLT初始化另存等权重且拓扑一致的副本。恢复已原序重放失败批、到健康step3900，参数全有限且源码吻合；迁移记录分别在两新检测目录的`numeric_migration.json`。补丁待现有固定权重连接对照完成后统一合入，不能把跨源码迁移称作原闭包exact resume。
 
 GPU2加速遵照用户新增授权，原batch10和250轮预算保持：同一健康3900批次，原重算稳定均值0.7742秒/步，保留激活0.6911秒/步，吞吐约+12.0%；峰值allocated20.97→34.58GiB，全部参数有限，首个loss相同。减少重算后的浮点梯度有正常数值差异，不称逐位相同训练轨迹。[重算对照](../results/v5/diagnostics/lated_recompute_benchmark_20261025.json) / [保留激活对照](../results/v5/diagnostics/lated_no_recompute_benchmark_20261025.json)。独立副本`lated_geometry_fast_20261025`同时保留几何头FP32修复；内存上限由.35授权为.80，容器RAM24GiB/CPU8/PID512不变，主目录CTW闭包未改；独立加速副本回归20项及5个子测试通过。从健康3900迁移全部八项状态，最佳epoch38也迁移保留；不使用interrupted.pt续训。[加速补丁](../experiments/autoresearch/v5/lated_no_recompute_20261025.patch)、新目录`numeric_migration.json`与`best_migration.json`记录来源。最初启动被旧.35硬限制挡住，调整授权副本后已实际运行，不把失败尝试记为训练完成。
+
+### 训练轮数是否不足（2026-10-25）
+
+当前容器训练和250轮基线预算保持。epoch必须同时看数据量、batch与更新数：本项目SynthText每轮85875次更新，2轮共171750；LATeD每轮90次更新，即使1000轮也只有90000次更新。不能用其他任务“几千轮”的数字判断这里是否欠训练。
+
+| 训练线 | 当前预算/观察 | 延长判断 |
+|---|---|---|
+| 独立Read R4/LSTR | 20轮/50740更新；best step36200 dev CER39.7753%，末次50.1642% | 后期已变差；不先盲加轮数，保留原best与独立基线 |
+| Read connector裁剪适配 | 16934词图、batch4；健康2400步约0.57轮，dev CER71.6919%→62.6768%；当前目标8468步/2轮 | 更值得检查欠拟合；先跑完2轮及原图连接复核，再考虑5、10轮分段 |
+| See CTW | 已完成250轮；epoch87已达54.9801%，最终best55.0292%（epoch217），末轮52.8061% | best增量约0.05pp，有平台迹象；延长须独立对照学习率，不预设千轮有效 |
+| See LATeD | 审计时约79轮，后续约87轮，尚未经历epoch100的第一次学习率下降 | 先完成当前250轮，不能现在判定轮数不足 |
+
+本地固定Self-DACE源中，`old_version/stage2/train_2stage.py`第141行确有`num_epochs=1000`默认值，对应独立去噪网络训练；new_version的增强阶段也设1000轮。[固定源脚本](https://github.com/John-Wendell/Self-DACE/blob/ec0c033def6c98a97b99c2938e7c8ffc50ba65fd/codes_SelfDACE/old_version/stage2/train_2stage.py#L141)。当前Read加载公共light/denoise权重后再适配OCR，这个1000轮默认值不能直接用作LoRA/联合微调的轮数要求。
+
+Seeing论文§5.1明确列出SynthText2轮、MLT100轮、batch10与250轮训练，并每100轮将学习率乘0.1：[原文](https://arxiv.org/html/2404.08965v3#S5.SS1)。按本地StepLR从1e-4延到1000轮，学习率会降至1e-14；仅改epochs不构成有效长程试验。Reading正文未找到明确epoch配方，不把本地20轮称为作者指定轮数：[原文](https://arxiv.org/html/2604.23685v1)。
+
+补充实验只看固定开发集，原250轮与Read独立基线封存；追加轮数和调整学习率分开登记。本轮grill-me已确认优先Read裁剪域适配。当前2轮及全部连接对照结束后，保持学习率2e-5、batch4、数据、冻结增强器和原LoRA不变，继续到5轮/21170更新；5轮相对2轮在同完整CTW权重上暗光原图GT CER改善≥1pp、暗光E2E F1不降且亮光F1退化≤1pp时，再到10轮/42340更新。各边界使用硬链接保留best/last和报告；不足门槛记为跳过，不把旧结果冒充10轮训练。See当前250轮计划不变。[曲线审计](../results/v5/diagnostics/training_duration_audit_20261025.json)。
 
 ## 5. 运行和证据入口
 
@@ -217,11 +234,12 @@ GPU2加速遵照用户新增授权，原batch10和250轮预算保持：同一健
 |---|---|
 | 检测旧主链/状态 | [DSConv精度恢复计划](../experiments/autoresearch/v5/queue_20261024_detection_dsconv_fp32.json) / [实时状态](../results/v5/queue_20261024_detection_dsconv_fp32.json)；MLT完成、LATeD3776中断，恢复见新记录 |
 | LATeD当前长程 | [授权加速计划](../experiments/autoresearch/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json) / [实时状态](../results/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json)；`LATeD_geometry_fast_20261025`，无短程上限 |
+| Read分段延长 | [5→10轮计划](../experiments/autoresearch/v5/queue_20261025_read_5to10_epochs_gpu3.json) / [状态](../results/v5/queue_20261025_read_5to10_epochs_gpu3.json)；等待现有全部对照结束，容器GPU3执行，门槛回归通过 |
 | GPU3后续Read/connector | [CTW后续计划](../experiments/autoresearch/v5/queue_20261025_ctw_then_read_connector_gpu3.json) / [状态](../results/v5/queue_20261025_ctw_then_read_connector_gpu3.json)；等待当前CTW完成后继续Read8468与凸包候选对照；随后[完整CTW连接复核](../experiments/autoresearch/v5/queue_20261025_full_ctw_connector_gpu3.json) |
 | LATeD数值恢复 | [短程计划](../experiments/autoresearch/v5/queue_20261025_lated_geometry_preflight.json) / [状态](../results/v5/queue_20261025_lated_geometry_preflight.json)；`LATeD_geometry_fp32_20261025`，原失败记录保留 |
 | Read裁剪域适配 | [短程计划](../experiments/autoresearch/v5/queue_20261025_connector_read_lora_pilot.json)；输出`results/v5/fusion/read_connector_lora_20261025/` |
 | 检测原主链 | `results/v5/detection/SynthText_dsconv_fp32_20261024/` → `MLT17_dsconv_fp32/` → `LATeD_dsconv_fp32/`；日志 `results/v5/queue_logs/20261024_Seeing_dsconv_fp32_full_chain.log` |
-| GPU3 CTW并行分支 | [当前计划](../experiments/autoresearch/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json) / [当前状态](../results/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json)；connector对照已完成、当前CTW目标训练中，日志 `results/v5/queue_logs/20261024_CTW_after_no_denoise_verified_gpu3.log`，完成后输出`results/v5/detection/CTW1500_dsconv_fp32/` |
+| GPU3 CTW并行分支 | [当前计划](../experiments/autoresearch/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json) / [当前状态](../results/v5/queue_20261024_connector_no_denoise_verified_then_ctw_gpu3.json)；connector对照已完成、CTW已完成250轮，日志 `results/v5/queue_logs/20261024_CTW_after_no_denoise_verified_gpu3.log`，完成后输出`results/v5/detection/CTW1500_dsconv_fp32/` |
 | 识别训练 | [GPU3计划](../experiments/autoresearch/v5/queue_20261022_reading_gpu3.json) / [实时状态](../results/v5/queue_20261022_reading_gpu3.json)；`results/v5/reading/R0str_frozen/、R2str_lora/、R4str_joint/` |
 | 识别锁定验收 | [后续计划](../experiments/autoresearch/v5/queue_20261022_reading_acceptance_gpu3.json) / [状态](../results/v5/queue_20261022_reading_acceptance_gpu3.json)；三组锁定官方LSTR测试均完成 |
 | 来源/规则 | `results/v5/source_snapshots/`；Self-DACE ec0c033、DSCNet0e35b2b；[执行规则](../experiments/autoresearch/v5/program.md)、[结果索引](../experiments/autoresearch/v5/results.tsv) |
@@ -230,7 +248,7 @@ GPU2加速遵照用户新增授权，原batch10和250轮预算保持：同一健
 
 ## 6. 到投稿的剩余工作与时间估计
 
-Reading官方test与完整MLT已完成。当前CTW还约1小时，完成后Read剩余长程与连接复核约20–40分钟；LATeD新加速分支还约4.5–5小时，按当前速度约10月25日晚间结束。预算是续满250轮，不以短程时间停止；正式评测、多种子和终测另计。
+Reading官方test、完整MLT与CTW250均已完成。GPU3继续Read两轮和现有连接复核，随后执行已授权的5轮、条件10轮扩展；GPU2 LATeD还约3.5–4小时。延长阶段沿用原学习率和每200步dev验证，预计5轮增加约40–60分钟，若到10轮再约1–2小时，以实际事件耗时修正。正式评测、多种子和终测另计。
 
 | 剩余步骤 | 交付证据 | 粗估时间 |
 |---|---|---|
