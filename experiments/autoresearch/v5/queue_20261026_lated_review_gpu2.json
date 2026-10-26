@@ -1,0 +1,18 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Human review assistance only: raw OCR plus frozen Self-DACE comparison; no GT/training changes",
+  "jobs": [
+    {
+      "id": "lated_review_raw_lle",
+      "argv": [
+        "python",
+        "tools/v5_lated_review.py"
+      ],
+      "report": "data/derived/v5/lated_mvp_20261026/review_assists_provenance.json",
+      "log": "results/v5/queue_logs/20261026_lated_review_raw_lle.log",
+      "timeout_seconds": 14400
+    }
+  ]
+}

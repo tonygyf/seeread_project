@@ -1,30 +1,43 @@
 <!doctype html>
 <html lang="zh-CN"><meta charset="utf-8"><title>LATeD 文字行人工复核</title>
 <style>
-body{font:16px system-ui;background:#15202b;color:#eee;margin:24px;max-width:1200px} input,select,button,textarea{font:inherit;padding:8px;margin:5px} textarea{width:95%;height:65px} img{max-width:100%;background:#111} #crop{max-height:250px} #context{max-height:440px} .muted{color:#acbaca} button{cursor:pointer} #progress{float:right} details{margin:12px 0}
+body{font:16px system-ui;background:#15202b;color:#eee;margin:24px;max-width:1200px} input,select,button,textarea{font:inherit;padding:8px;margin:5px} textarea{width:95%;height:90px} img{max-width:100%;background:#111} .comparison{display:flex;flex-wrap:wrap;gap:16px}.comparison figure{flex:1;min-width:250px;margin:12px 0}.comparison img{max-height:360px;object-fit:contain;cursor:zoom-in} #context{max-height:440px} .muted{color:#acbaca} button{cursor:pointer} #progress{float:right} details{margin:12px 0}.ocr{white-space:pre-wrap;overflow-wrap:anywhere;background:#203141;padding:12px;min-height:24px}
 </style>
 <h2>LATeD 文字行复核 <span id="progress"></span></h2>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="view_gamma" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="gamma_r" type="gamma" exponent="0.4"/><feFuncG id="gamma_g" type="gamma" exponent="0.4"/><feFuncB id="gamma_b" type="gamma" exponent="0.4"/></feComponentTransfer></filter></svg>
 <p>先审核 pilot.html 的20张图。语言需重新确认；OCR仅是草稿。保持大小写、标点和行内空格；整行含其他文字选“混合”，不要删去其他语言后当英文真值。看不清与未审核分别记录。</p>
 <label>复核人 <input id="reviewer" placeholder="姓名或标注员编号"></label>
 <label>跳转行 <input id="jump" type="number" min="1" style="width:80px"><button id="go">跳转</button></label>
-<div id="identity"></div><img id="crop" alt="原图文字行裁剪">
+<div id="identity"></div>
+<div class="comparison">
+<figure><figcaption>原图文字行（点击查看大图）</figcaption><a id="crop_link" target="_blank" rel="noopener"><img id="crop" alt="原图文字行裁剪"></a></figure>
+<figure><figcaption>LLE 增强对照（仅辅助人眼）</figcaption><label>显示提亮 γ <input id="gamma" type="range" min="0.2" max="1" step="0.05" value="0.4"><output id="gamma_value">0.4</output>（1为原增强亮度）</label><a id="lle_link" target="_blank" rel="noopener"><img id="lle" alt="Self-DACE增强文字行" style="filter:url(#view_gamma)"></a><p id="lle_state" class="muted"></p></figure>
+</div>
 <details><summary>原图上下文（黄色编号对应文字行）</summary><img id="context" alt="原图上下文"></details>
-<p class="muted" id="draft"></p>
+<div class="comparison">
+<figure><figcaption>原图 OCR（绕过增强器，同一识别器）</figcaption><div class="ocr" id="draft_raw"></div><button id="use_raw">采用原图OCR</button></figure>
+<figure><figcaption>增强 OCR（现有 Self-DACE＋Read）</figcaption><div class="ocr" id="draft_enhanced"></div><button id="use_enhanced">采用增强OCR</button></figure>
+</div>
+<p class="muted">编辑框已预填增强OCR草稿；若为空则采用原图OCR。请对照原图纠错，再选择语言及“已确认”。空结果表示模型未读出文字。</p>
 <label>语言 <select id="language"><option value="unknown">待判定</option><option value="latin">英文／拉丁字符及数字</option><option value="non_latin">其他文字</option><option value="mixed">混合文字</option></select></label>
 <label>审核状态 <select id="status"><option value="pending">未审核</option><option value="reviewed">已确认</option><option value="unreadable">无法辨认</option></select></label>
 <textarea id="text" placeholder="人工确认的整行转写；非拉丁字符首批可仅标语言"></textarea>
-<div><button id="use">复制OCR草稿</button><button id="previous">保存并上一行</button><button id="next">保存并下一行</button><button id="pending">下一条未审核</button><button id="export">导出审核JSON</button></div>
+<div><button id="previous">保存并上一行</button><button id="next">保存并下一行</button><button id="pending">下一条未审核</button><button id="export">导出审核JSON</button></div>
 <p class="muted">浏览器本地保存；导出后用 finalize_lated.py 导入独立sidecar。草稿不会自动变为“已确认”。原检测标注不会被修改。</p>
 <script>
 const ITEMS=__ITEMS__,PROTOCOL=__PROTOCOL__,KEY='lated_review_'+PROTOCOL;
 let stored=JSON.parse(localStorage.getItem(KEY)||'{"annotations":{},"reviewer":""}'),cur=0;
 const el=id=>document.getElementById(id);
-function record(){return stored.annotations[ITEMS[cur].id]||{text:'',language:'unknown',status:'pending'};}
+function record(){return stored.annotations[ITEMS[cur].id]||{text:ITEMS[cur].draft||'',language:'unknown',status:'pending'};}
 function save(){if(!ITEMS.length)return;stored.annotations[ITEMS[cur].id]={text:el('text').value.normalize('NFC').trim(),language:el('language').value,status:el('status').value};stored.reviewer=el('reviewer').value.trim();localStorage.setItem(KEY,JSON.stringify(stored));}
-function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('crop').src=it.crop;el('context').src=it.context;el('draft').textContent='OCR草稿（需复核）：'+(it.draft||'未生成／空结果');for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;}
+function draftLabel(text,error){return error?'裁剪失败：'+error:text===null||text===undefined?'正在生成，请稍后刷新':text||'（空结果）';}
+function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'增强图正在生成，请稍后刷新。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;}
 el('reviewer').value=stored.reviewer;
 el('previous').onclick=()=>{save();cur--;show();};el('next').onclick=()=>{save();cur++;show();};el('go').onclick=()=>{save();cur=Number(el('jump').value)-1;show();};
-el('use').onclick=()=>{el('text').value=ITEMS[cur].draft||'';};
+function adopt(key){el('text').value=ITEMS[cur][key]||'';el('status').value='pending';save();}
+el('use_raw').onclick=()=>adopt('draft_raw');el('use_enhanced').onclick=()=>adopt('draft_enhanced');
+el('gamma').oninput=()=>{for(let c of ['r','g','b'])el('gamma_'+c).setAttribute('exponent',el('gamma').value);el('gamma_value').textContent=el('gamma').value;};
+for(let k of ['text','language','status','reviewer'])el(k).oninput=save;
 el('pending').onclick=()=>{save();for(let n=1;n<=ITEMS.length;n++){let i=(cur+n)%ITEMS.length;if((stored.annotations[ITEMS[i].id]?.status||'pending')==='pending'){cur=i;break;}}show();};
 el('export').onclick=()=>{save();if(!stored.reviewer){alert('请填写复核人');return;}let annotations=ITEMS.map(it=>({id:it.id,...(stored.annotations[it.id]||{text:'',language:'unknown',status:'pending'})}));let payload={protocol_sha256:PROTOCOL,reviewer:stored.reviewer,annotations};let a=document.createElement('a');let url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download='lated_review_'+PROTOCOL.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 show();

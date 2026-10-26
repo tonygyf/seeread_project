@@ -4,13 +4,30 @@ from pathlib import Path
 
 import pytest
 
-from seeread.v5.lated_annotations import import_reviews, labelled_rows, latin_text, write_jsonl
+from seeread.v5.lated_annotations import import_reviews, labelled_rows, latin_text, write_jsonl, render_pages
 from seeread.v5.lated_evaluation import image_counts, evaluate_records, paired_comparison, reliable_training_matches
 from seeread.v5.reading import sha256
 
 
 def box(x0, x1):
     return [[x0, 0], [x1, 0], [x1, 10], [x0, 10]]
+
+
+def test_review_pages_keep_package_identity_and_both_ocr_candidates(tmp_path):
+    (tmp_path/'protocol.json').write_text('{"frozen":true}')
+    write_jsonl(tmp_path/'tasks.jsonl', [dict(id='one',pilot=True),dict(id='two',pilot=False)])
+    write_jsonl(tmp_path/'drafts.jsonl', [dict(id='one',text='</script>enhanced'),dict(id='two',text='',crop_error='invalid')])
+    write_jsonl(tmp_path/'review_assists.jsonl', [dict(id='one',raw_text='raw',enhanced_text='</script>enhanced',lle_crop='crops_lle/one.png')])
+    identity = sha256(tmp_path/'protocol.json'), sha256(tmp_path/'tasks.jsonl')
+    render_pages(tmp_path)
+    page = (tmp_path/'pilot.html').read_text()
+    items = json.loads(page.split('const ITEMS=',1)[1].split(',PROTOCOL=',1)[0])
+    assert len(items) == 1 and items[0]['draft_raw'] == 'raw'
+    assert items[0]['draft_enhanced'] == '</script>enhanced' and items[0]['lle_crop'] == 'crops_lle/one.png'
+    assert '</script>enhanced' not in page
+    all_items = json.loads((tmp_path/'review.html').read_text().split('const ITEMS=',1)[1].split(',PROTOCOL=',1)[0])
+    assert all_items[1]['draft_raw'] is None and all_items[1]['enhanced_crop_error'] == 'invalid'
+    assert identity == (sha256(tmp_path/'protocol.json'),sha256(tmp_path/'tasks.jsonl'))
 
 
 def test_voc_duplicate_does_not_match_second_best_unused_gt():

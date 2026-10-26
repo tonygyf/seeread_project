@@ -43,7 +43,17 @@ def render_pages(output):
     output = Path(output)
     items = read_jsonl(output / 'tasks.jsonl')
     drafts = {r['id']: r for r in read_jsonl(output / 'drafts.jsonl')} if (output / 'drafts.jsonl').exists() else {}
-    items = [{**it, 'draft': drafts.get(it['id'], {}).get('text', '')} for it in items]
+    assists = {r['id']: r for r in read_jsonl(output / 'review_assists.jsonl')} if (output / 'review_assists.jsonl').exists() else {}
+    enriched = []
+    for it in items:
+        assist = assists.get(it['id'], {})
+        before = drafts.get(it['id'], {})
+        enhanced = assist.get('enhanced_text', before.get('text'))
+        raw = assist.get('raw_text')
+        enriched.append({**it, 'draft': enhanced or raw or '', 'draft_raw': raw, 'draft_enhanced': enhanced,
+                         'lle_crop': assist.get('lle_crop'), 'raw_crop_error': assist.get('raw_crop_error'),
+                         'enhanced_crop_error': assist.get('enhanced_crop_error', before.get('crop_error'))})
+    items = enriched
     template = (Path(__file__).resolve().parents[2] / 'tools/data/lated_review_template.html').read_text()
     for name, selected in [('review', items), ('pilot', [i for i in items if i['pilot']])]:
         payload = json.dumps(selected, ensure_ascii=False).replace('<', '\\u003c')
