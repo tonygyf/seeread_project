@@ -297,13 +297,18 @@ LATeD配对差95%原图bootstrap区间[9.0149,22.6948]pp；原裁剪15个命中�
 
 **首批：200张训练图2127行＋100张开发图914行；20张试标图258行。** seed0按图像内容SHA分组选择整个训练组；官方test没有进入转写包。所有源图、冻结GT及稳定实例ID保留，`lang=en`旧占位字段不作为语言依据。每一行需标审核状态及语言，拉丁行确认完整转写；非拉丁／混合／不可辨认行单列，检测仍计入。仅符号不进入拉丁E2E；裁剪失败保留空预测参与CER。
 
-人工页面：[20图试标](../data/derived/v5/lated_mvp_20261026/pilot.html)、[全部300图](../data/derived/v5/lated_mvp_20261026/review.html)。 本机预览服务已绑定127.0.0.1：转发8765后访问`http://localhost:8765/pilot.html`；转发8766后访问`http://localhost:8766/preview.html`查看完整100图模型输出。两个服务仅提供对应产物目录，不提供仓库根目录。OCR草稿3041行全部生成，复制草稿不会自动确认审核。试标与全量页面共享同包的本地进度；导出JSON前填写复核人。修改为pending再导入会撤销该实例旧确认；跨包或未知实例拒绝导入。
+人工页面：[20图试标](../data/derived/v5/lated_mvp_20261026/pilot.html)、[全部300图](../data/derived/v5/lated_mvp_20261026/review.html)。 通过[LabLink](https://github.com/tonygyf/lablink)连接时，在Windows浏览器直接访问[20图试标](http://100.88.81.10:8765/pilot.html)、[全部300图](http://100.88.81.10:8765/review.html)与[完整识别预览](http://100.88.81.10:8766/preview.html)。页面已单独绑定服务器Tailscale地址100.88.81.10；不需要VS Code端口转发。原127.0.0.1入口保留。两个服务仅提供对应产物目录，不提供仓库根目录。服务器端三个地址均返回HTTP200，Windows客户端实际连通性仍需用户浏览器确认。OCR草稿3041行全部生成，复制草稿不会自动确认审核。试标与全量页面共享同包的本地进度；导出JSON前填写复核人。修改为pending再导入会撤销该实例旧确认；跨包或未知实例拒绝导入。
 
 独立sidecar包含实例ID、原图路径及摘要、split、原始NFC转写、语言、审核状态和复核人；原多边形和检测ignore不改变。先审核试标包并确认规则，再分批完成首批300图。全量1500图不作为首版前置；后续正式端到端终测转写与开发/训练独立封存。新增标注可独立整理发布，原始图像再分发另核源许可。
 
 整图入口`tools/v5_lated.py infer`已在真实LATeD dev运行；输出逐图JSONL、实例轮廓/score/text/crop_error、叠加图片和preview.html。20图预览175个检测实例见[展示页](../results/v5/fusion/lated_mvp_preview20_20261026/preview.html)，完整100图的最终入口复核已完成，共685个检测实例、1个几何裁剪失败；见[完整预览](../results/v5/fusion/lated_mvp_verified_20261026/preview.html)与[运行状态](../results/v5/queue_20261026_lated_mvp_verified_gpu2.json)。这些是模型预测展示，尚无人工真值，不能称真实端到端指标已达标。
 
 公开评测对拍：使用固定[CTW作者源](https://github.com/Yuliang-Liu/Curve-Text-Detector/blob/2126a660d3baf3e84a76e77352597576519c35a2/tools/ctw1500_evaluation/voc_eval_polygon.py)，只临时处理Python2语法、NumPy别名和pickle二进制模式；正确框、重复框、IoU恰为0.5及不相交四组案例P/R与移植逐项一致。保留作者的输入顺序、best-overall GT、严格IoU>0.5及重复FP规则；新增空预测安全计分和OCR eligibility分母。该移植支持LATeD变长GT，不复制老师私有代码。[对拍](../results/v5/diagnostics/lated_voc_public_parity_20261026.json) / [完整dev重算](../results/v5/diagnostics/lated_voc_dev_20261026.json)。新旧F1差约0.0923pp，评测口径不足以解释主要差距。
+
+该100图评测记录含914个GT文字区域、682个计分预测，其中420个一对一匹配正确；FP=262、FN=494。P=420/682=61.58%（画出的框有多少正确），R=420/914=45.95%（全部文字找回多少），F1=2×P×R/(P+R)=52.63%。匹配依据多边形IoU=交集面积/并集面积，严格大于0.5；同一GT的重复框计FP。该组是**See检测指标，不检查读出的文字**；未来端到端指标还要求人工转写与识别结果匹配，Read独立识别主要报告CER。无转写真值时，报告中的Latin E2E零值不解释为真实识别成绩。
+
+这些分子分母来自保存的训练dev评测记录（OpenCV uint8 resize）；MVP展示入口使用原图浮点resize，所以预览输出685个框不能直接充当这组682个计分框。两种预处理的数目不混用。
+
 
 新实验补丁采用零上下文格式，在对应数值修复副本上用`git apply --unidiff-zero`应用；SCM末层补丁基于Fig2副本，SCM目标／分类平衡补丁基于原geometry_fast副本。
 
