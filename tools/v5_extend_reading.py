@@ -23,9 +23,13 @@ def extension_gate(reference, candidate):
         raise ValueError('Extension needs complete paired development evaluations')
     if reference['data_hashes'] != candidate['data_hashes']:
         raise ValueError('Extension requires the same fixed development data')
-    for name in ('seeread/v5/spotting.py', 'seeread/models/rectify.py', 'seeread/v5/seeing_decode.py'):
+    for name in ('seeread/v5/spotting.py', 'seeread/models/rectify.py', 'seeread/v5/seeing_decode.py',
+                 'tools/v5_eval_connector.py', 'tools/v5_eval_spotting.py'):
         if reference['source_hashes'][name] != candidate['source_hashes'][name]:
             raise ValueError('Extension requires the same connector and decoder implementation')
+    for name in ('decoder', 'detector_hw', 'exposure'):
+        if reference['config'][name] != candidate['config'][name]:
+            raise ValueError(f'Extension requires the same evaluation protocol: {name}')
     for report in (reference, candidate):
         if report['config']['cases'] != ['boundary_when_supported'] or report['config']['enhancement'] != 'full':
             raise ValueError('Use the retained crop and full enhancer for the extension gate')

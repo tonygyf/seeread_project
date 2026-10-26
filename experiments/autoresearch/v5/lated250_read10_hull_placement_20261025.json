@@ -1,0 +1,47 @@
+{
+  "experiment": {
+    "id": "lated250_read10_hull_placement",
+    "role": "fixed-weight development placement diagnosis; no retraining"
+  },
+  "data_root": "data",
+  "manifests": {
+    "bright": "data/annotations/v5/fusion/totaltext_dev_bright.jsonl",
+    "dark": "data/annotations/v5/fusion/totaltext_dev_dark.jsonl"
+  },
+  "protocol": "data/annotations/v5/fusion/totaltext_dev_protocol.json",
+  "weights": {
+    "detector": "results/v5/detection/LATeD_geometry_fast_20261025/best.pt",
+    "reading": "results/v5/fusion/read_connector_lora_20261025/best.pt"
+  },
+  "cases": {
+    "A": "none",
+    "B": "after_crop",
+    "C": "before_detector"
+  },
+  "detector_hw": [
+    640,
+    640
+  ],
+  "crop": {
+    "output_hw": [
+      384,
+      384
+    ],
+    "center_points": 32,
+    "pad": 1.1,
+    "sampling": "boundary_with_hull_fallback"
+  },
+  "decoder": {
+    "text_threshold": 0.5,
+    "center_threshold": 0.5,
+    "rectangle_width": 6.0,
+    "sample_step": 3.0,
+    "max_samples": 64,
+    "close_kernel": 3,
+    "min_component_area": 3,
+    "min_polygon_area": 3,
+    "max_detections": 100
+  },
+  "memory_fraction": 0.35,
+  "output": "results/v5/fusion/lated250_read10_hull_placement_20261025"
+}

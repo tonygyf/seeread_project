@@ -74,6 +74,20 @@ def test_adjacent_instances_stay_separate_and_fps_is_deterministic():
     assert len(set(farthest_point_sampling(pts, 4).tolist())) == 4
 
 
+def test_optional_all_contours_retains_disconnected_reconstruction_fragments():
+    mask = np.zeros((24, 40), np.int64)
+    mask[12, 4:36] = 1
+    target = dict(text=mask, center=mask, height=np.full(mask.shape, 6., np.float32),
+                  angle=np.zeros(mask.shape, np.float32))
+    kwargs = dict(image_hw=mask.shape, rectangle_width=2., sample_step=20., max_samples=3,
+                  close_kernel=0)
+    original = decode(_prediction(target), **kwargs)
+    candidate = decode(_prediction(target), keep_all_contours=True, **kwargs)
+    assert len(original) == 1 and len(candidate) == 3
+    assert any(np.array_equal(original[0]['poly'], p['poly']) for p in candidate)
+    assert len(decode(_prediction(target), **kwargs)) == 1
+
+
 def test_vertical_and_polygon_vertex_start_winding_do_not_change_targets():
     polygon = np.array([[100, 20], [140, 20], [140, 220], [100, 220]], np.float32)
     target, _ = _roundtrip(polygon, (240, 400), (60, 100))

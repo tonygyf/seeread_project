@@ -50,7 +50,7 @@ def _positive_probability(logits):
 
 def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold=.5,
            rectangle_width=6., sample_step=3., max_samples=64, close_kernel=3,
-           min_component_area=3, min_polygon_area=3, max_detections=100):
+           min_component_area=3, min_polygon_area=3, max_detections=100, keep_all_contours=False):
     """One image -> list of {'poly': Nx2 image-pixel ndarray, 'score': float}.
 
     Specify exactly one of image_hw=(H,W) or stride=scalar/(stride_y,stride_x).
@@ -110,14 +110,17 @@ def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold
         contours, _ = cv2.findContours(accumulated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             continue
-        contour = max(contours, key=cv2.contourArea)
-        if cv2.contourArea(contour) < min_polygon_area:
-            continue
-        polygon = cv2.approxPolyDP(contour, .005 * cv2.arcLength(contour, True), True).reshape(-1, 2).astype(np.float32)
-        if len(polygon) < 3:
-            continue
-        interior = np.zeros((fh, fw), np.uint8)
-        cv2.fillPoly(interior, [contour], 1)
-        results.append(dict(poly=polygon * scale, score=float(tp[interior > 0].mean())))
+        # Candidate-only: fragmented reconstruction can contain several valid contours.
+        if not keep_all_contours:
+            contours = [max(contours, key=cv2.contourArea)]
+        for contour in contours:
+            if cv2.contourArea(contour) < min_polygon_area:
+                continue
+            polygon = cv2.approxPolyDP(contour, .005 * cv2.arcLength(contour, True), True).reshape(-1, 2).astype(np.float32)
+            if len(polygon) < 3:
+                continue
+            interior = np.zeros((fh, fw), np.uint8)
+            cv2.fillPoly(interior, [contour], 1)
+            results.append(dict(poly=polygon * scale, score=float(tp[interior > 0].mean())))
     results.sort(key=lambda item: -item['score'])
     return results[:max_detections] if max_detections else results

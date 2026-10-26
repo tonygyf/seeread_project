@@ -1,0 +1,37 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "wait_for_report": "results/v5/queue_20261025_completed_connector_gpu3.json",
+  "scope": "Fixed completed weights and hull crop; A vs B isolates crop enhancement, A vs C isolates detector-input enhancement; no test or retraining.",
+  "jobs": [
+    {
+      "id": "ctw250_placement",
+      "argv": [
+        "python",
+        "tools/v5_eval_spotting.py",
+        "--config",
+        "experiments/autoresearch/v5/ctw250_read10_hull_placement_20261025.json"
+      ],
+      "report": "results/v5/fusion/ctw250_read10_hull_placement_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_ctw250_read10_placement.log",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "lated250_placement",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--task",
+        "placement",
+        "--config",
+        "experiments/autoresearch/v5/lated250_read10_hull_placement_20261025.json"
+      ],
+      "report": "results/v5/fusion/lated250_read10_hull_placement_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_lated250_read10_placement.log",
+      "timeout_seconds": 3600
+    }
+  ]
+}

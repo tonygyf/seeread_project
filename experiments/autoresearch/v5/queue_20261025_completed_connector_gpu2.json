@@ -1,0 +1,58 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Completed baselines; fixed development pairs; compare original/adapted Read and retained/hull crops. No official test or training.",
+  "jobs": [
+    {
+      "id": "lated250_R4",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--task",
+        "connector",
+        "--detector",
+        "results/v5/detection/LATeD_geometry_fast_20261025/best.pt",
+        "--reading",
+        "results/v5/reading/R4str_joint/best.pt",
+        "--output",
+        "results/v5/fusion/connector_lated250_R4_hull_check_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "boundary_with_hull_fallback",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_lated250_R4_hull_check_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_lated250_R4_hull_check.log",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "lated250_read10",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--task",
+        "connector",
+        "--detector",
+        "results/v5/detection/LATeD_geometry_fast_20261025/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_lated250_read10_hull_check_20261025",
+        "--sampling",
+        "boundary_when_supported",
+        "boundary_with_hull_fallback",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_lated250_read10_hull_check_20261025/run.json",
+      "log": "results/v5/queue_logs/20261025_lated250_read10_hull_check.log",
+      "timeout_seconds": 3600
+    }
+  ]
+}

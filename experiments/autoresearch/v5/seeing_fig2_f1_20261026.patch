@@ -1,0 +1,67 @@
+--- a/seeread/v5/seeing.py
++++ b/seeread/v5/seeing.py
+@@ -120,8 +120,8 @@
+                            accumulation_dtype='float32', heads=1, learned_temperature=False, residual=False),
+             assumptions=['three PM stages at stride16/8/4', 'two-axis DSC concat and 1x1 projection',
+                          'post-attention 1x1 projection', 'SCM two-class one-hot mask input',
+-                         'SCM F1 is the first PM output at stride16',
+-                         'main semantic adapter stays on image-only path', 'positive height via softplus',
++                         'SCM F1 is deepest feature upsampled to stride16 before all PM blocks',
++                         'image-only adaptive(F1) is added residually to F1 before first PM', 'positive height via softplus',
+                          'tangent angle pi-periodic via bounded scalar'],
+         )
+         self.provenance['dsconv'] = getattr(self.pm[0].snake_h, 'provenance', {})
+@@ -142,15 +142,14 @@
+         for layer, lateral in zip(self.layers, self.lateral):
+             x = layer(x)
+             features.append(lateral(x))
+-        f = features[-1]
+-        semantic = None
++        # Fig.2 branches SCM from F1 before all PM blocks; adaptive is residual.
++        f = F.interpolate(features[-1], size=features[2].shape[-2:], mode='bilinear', align_corners=False)
++        scm_input = f
++        semantic = self.semantic_adapter(f)
++        f = f + semantic
+         for index, level in enumerate((2, 1, 0)):
+             f = F.interpolate(f, size=features[level].shape[-2:], mode='bilinear', align_corners=False)
+             f = self.pm[index](torch.cat((features[level], f), 1))
+-            if index == 0:
+-                scm_input = f
+-                f = self.semantic_adapter(f)
+-                semantic = f
+         # Both classification convolutions exceeded FP16 range before BN
+         # normalization on real SynthText batches (steps28860/32962).
+         with torch.autocast(image.device.type, enabled=False):
+--- /dev/null
++++ b/tests/v5/test_fig2_scm_layout.py
+@@ -0,0 +1,30 @@
++"""Fig.2: pre-PM F1 branches to SCM; image-only adaptive returns residually."""
++import torch
++from torch import nn
++from torch.nn import functional as F
++from seeread.v5.seeing import SeeingDetector
++
++class FakeDSConv(nn.Conv2d):
++    def __init__(self, cin, cout, **kwargs):
++        super().__init__(cin, cout, 3, padding=1)
++
++def test_fig2_branch_and_residual_are_the_actual_forward_path():
++    torch.set_num_threads(1)
++    torch.manual_seed(4)
++    model = SeeingDetector(channels=4, pretrained=False, dsconv_factory=FakeDSConv).train()
++    observed = {}
++    handles = [model.lateral[-1].register_forward_hook(lambda m,a,b: observed.update(deepest=b)),
++               model.pm[0].register_forward_pre_hook(lambda m,a: observed.update(pm_input=a[0])),
++               model.scm.register_forward_pre_hook(lambda m,a: observed.update(scm_input=a[0]))]
++    image = torch.rand(2,3,64,96)
++    result = model(image, with_scm=True, mask=torch.zeros(2,64,96,dtype=torch.long))
++    f1 = F.interpolate(observed['deepest'],size=(4,6),mode='bilinear',align_corners=False)
++    torch.testing.assert_close(observed['scm_input'],f1)
++    torch.testing.assert_close(observed['pm_input'][:,4:],f1+result['sem_main'])
++    other = model(image, with_scm=True, mask=torch.ones(2,64,96,dtype=torch.long))
++    for key in ('text','center','height','angle'):
++        torch.testing.assert_close(result[key],other[key],rtol=0,atol=0)
++    result['text'].square().mean().backward()
++    assert any(p.grad is not None and p.grad.abs().sum()>0 for p in model.semantic_adapter.parameters())
++    assert all(p.grad is None for p in model.scm.parameters())
++    for handle in handles:handle.remove()

@@ -18,8 +18,10 @@ class ConnectorSplitTests(unittest.TestCase):
         def report(cer, dark_f=.1, bright_f=.2):
             return dict(status='complete', data_hashes={'dev': 'fixed'}, weights={'det.pt': 'same'},
                         source_hashes={name: 'same' for name in ('seeread/v5/spotting.py',
-                                      'seeread/models/rectify.py', 'seeread/v5/seeing_decode.py')},
+                                      'seeread/models/rectify.py', 'seeread/v5/seeing_decode.py',
+                                      'tools/v5_eval_connector.py', 'tools/v5_eval_spotting.py')},
                         config=dict(weights={'detector': 'det.pt'}, crop={'pad': 1.1},
+                                    decoder={'text_threshold': .5}, detector_hw=[640, 640], exposure='none',
                                     cases=['boundary_when_supported'], enhancement='full'),
                         results={key: dict(complete=True, cases={'boundary_when_supported':
                             dict(gt_crop_raw={'cer': cer}, spotting={'e2e_F': value})})
@@ -33,6 +35,17 @@ class ConnectorSplitTests(unittest.TestCase):
         mismatch['weights']['det.pt'] = 'different'
         with self.assertRaisesRegex(ValueError, 'identical detector'):
             extension_gate(base, mismatch)
+        for key, value in [('decoder', {'text_threshold': .3}), ('detector_hw', [320, 320]),
+                           ('exposure', 'p95')]:
+            mismatch = copy.deepcopy(base)
+            mismatch['config'][key] = value
+            with self.subTest(config=key), self.assertRaisesRegex(ValueError, 'evaluation protocol'):
+                extension_gate(base, mismatch)
+        for name in ('tools/v5_eval_connector.py', 'tools/v5_eval_spotting.py'):
+            mismatch = copy.deepcopy(base)
+            mismatch['source_hashes'][name] = 'different'
+            with self.subTest(source=name), self.assertRaisesRegex(ValueError, 'implementation'):
+                extension_gate(base, mismatch)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 # 04 v5 论文对齐与实验状态
 
-更新：2026-10-25 15:59（北京时间）。**CTW目标训练已完成250轮/22500更新，内部dev best F1 55.0292%（epoch217），末轮52.8061%；GPU3已恢复Read裁剪域两轮训练。GPU2 LATeD约87/250轮，按原预算继续。用户选择优先检验Read多轮：现有两轮及全部连接对照完成后，保持同学习率/数据/模块接到5轮，满足开发门槛才到10轮；独立Read和See基线保留。官方评测与终测后置。**
+更新：2026-10-26（北京时间）。**SynthText2轮、MLT100轮、CTW250轮、LATeD250轮及Read裁剪适配10轮预算全部完成。LATeD内部dev best F1 52.7239%（epoch199），CTW为55.0292%（epoch217）。Read最佳出现在step24800（约5.86轮），固定原图暗光GT-crop CER从68.9464%降至57.9583%；10轮末权重没有刷新最佳。完整权重连接、凸包及增强位置对照均完成；正在GPU2执行已授权Fig2连接修正的5轮同起点对照；官方检测评测及终测继续后置。**
 
 ## 1. 识别：完整测试结果与论文差距
 
@@ -38,14 +38,14 @@
 | 同step85600 | CTW1500 | **19.9747** | **22.4113** | **21.1230** |
 | 修复后step85875，第1完整epoch | CTW1500 | **17.9518** | **21.1348** | **19.4137** |
 
-[step85600 LATeD](../results/v5/diagnostics/detection_stage_20261023/lated_dev/run.json) / [CTW](../results/v5/diagnostics/detection_stage_20261023/ctw_dev/run.json)；首轮验证见新SynthText目录的`dev_epoch_0001_attempt_001.jsonl`。此前step57200的LATeD/CTW F1为23.5880/20.0712%；阶段波动不能证明持续提升，也不能据此判断MLT效果。当前Recall仍低，先完成预登记训练，再评估目标阶段。
+[step85600 LATeD](../results/v5/diagnostics/detection_stage_20261023/lated_dev/run.json) / [CTW](../results/v5/diagnostics/detection_stage_20261023/ctw_dev/run.json)；首轮验证见新SynthText目录的`dev_epoch_0001_attempt_001.jsonl`。此前step57200的LATeD/CTW F1为23.5880/20.0712%；阶段波动不能证明持续提升，也不能据此判断MLT效果。这组数值保留作预训练历史；完整目标阶段已完成，见下表。
 
 | 任务 | 当前进度 | 后续 |
 |---|---|---|
 | SynthText | 已完成2轮、171750更新 | 健康末权重已用于MLT |
 | MLT17 | **已完成100轮、72000更新**；train7200/dev1795 | LATeD和CTW共享同一完整父权重 |
-| LATeD / GPU2 | 原链41轮后溢出；修复后健康3900已恢复，当前超过48轮；原最佳内部dev F1 **51.3750%**（epoch38） | `LATeD_geometry_fast_20261025`，batch10、无短程上限，续满250轮 |
-| CTW / GPU3 | **完成250/250轮、22500更新**；内部dev best F1 **55.0292%**（217轮），末轮52.8061% | 已交接GPU3给Read两轮与连接对照，后接5→10轮受控探查 |
+| LATeD | **完成250轮/22500更新**；内部dev best P/R/F1 **61.6398/46.0613/52.7239%**（epoch199），末轮F1 51.7263% | `LATeD_geometry_fast_20261025`，恢复及加速记录保留 |
+| CTW / GPU3 | **完成250/250轮、22500更新**；内部dev best F1 **55.0292%**（217轮），末轮52.8061% | 完整权重已用于Read 2/5/10轮对照 |
 | Read / connector | R2/R4独立训练和LSTR验收完成；新增完整MLT、LATeD阶段连接诊断 | 固定增强器、仅LoRA做裁剪域适配；不覆盖独立R4 |
 
 MLT末轮dev内部P/R/F1为54.5029/40.0639/46.1811%，最佳F1为51.9490%（epoch82）。它已完整用于两个目标检测分支；不同检测checkpoint的域迁移结果见§4，不把跨阶段差值称为MLT因果收益。MLT未加入独立Reading训练。
@@ -86,7 +86,7 @@ Seeing论文test F1目标LATeD/CTW/TotalText为67.1/86.2/88.5%，见[Table2/3](h
 | MLT17 | 全11ZIP校验、9000图全解码/GT配对；train7200/dev1795；5验证副本隔离、4单帧GIF保留源并转无损PNG | 已完成100/100轮；压缩包校验后已安全清理，解压数据保留 |
 | SynthText / LATeD | SynthText858750路径非空、清单摘要匹配；LATeD900/100/500，无转写 | LATeD全train1000 refit未做；暂无真实暗光spotting真值 |
 | CTW1500 | MMOCR train1000/7703实例保留坐标；冻结900/100。镜像test3075实例/387ignore；另存作者检测候选test3068实例 | 训练/测试图像已齐、可继续实验；两源67图测试几何不同，待锁定标注版本与官方评测；不要求另下载整套训练图 |
-| Total-Text | 新train-only候选1255图/10579实例/1294ignore；按作者第6列orientation判定ignore，修复6处旧候选错误；10个单点ignore单列 | 候选未采用，冻结训练/测试及现融合均未改；当前融合100图无真实ignore差异，1个单点过滤已登记 |
+| Total-Text | 新train-only候选1255图/10579实例/1294ignore；按作者第6列orientation判定ignore，修复6处旧候选错误；10个单点ignore单列 | 独立检测及冻结测试未改；裁剪域Read适配已采用其train-only转写候选；当前融合100图无真实ignore差异，1个单点过滤已登记 |
 | MSRA-TD500 | 未下载；当前方案不使用 | 可选扩展基准，含自身训练/测试划分；仅覆盖论文该列时需要，本轮不下载 |
 | 官方检测评测 | 已缓存固定版本CTW/TotalText作者评测源并核SHA；GT导出允许逐坐标相同的作者退化轮廓，预测仍严格校验 | 官方执行适配尚未接通，LATeD官方协议仍需落实；当前内部F1不替代官方成绩 |
 
@@ -108,7 +108,7 @@ Reading当前路径是“词图增强→TrOCR”；Seeing本身是检测器。**
 
 A/B/C共用相同OCR、检测器和增强器权重。R2训练权重与R4训练权重的整方法比较另报，不能代替位置消融。保留暗/亮spotting F1、检测F1、GT crop raw/lower-alnum CER、失败裁剪数和延迟；token/收敛模块后置，不先堆模块。
 
-固定开发数据已生成：**同100图明暗配对，每支821实例/94ignore**，恢复旧val遗漏6实例；暗图为physical/dark、固定seed1234，原图和暗图与现TT train1152/test300字节SHA交集均0。[协议](../data/annotations/v5/fusion/totaltext_dev_protocol.json)。不使用ESTR或测试集选模块。正式融合验收采用完整目标权重；开发对照允许使用固定中间快照。`tools/v5_eval_spotting.py` 与单份 `configs/v5/fusion_placement_dev.yaml` 已实现；CPU预检通过100对标注和200张图像摘要，当前待填两份固定基线权重。识别器及采样运行异常直接上抛，几何非法裁剪仍纳入CER分母；9项CPU测试通过。
+固定开发数据已生成：**同100图明暗配对，每支821实例/94ignore**，恢复旧val遗漏6实例；暗图为physical/dark、固定seed1234，原图和暗图与现TT train1152/test300字节SHA交集均0。[协议](../data/annotations/v5/fusion/totaltext_dev_protocol.json)。不使用ESTR或测试集选模块。正式融合验收采用完整目标权重；开发对照允许使用固定中间快照。`tools/v5_eval_spotting.py` 与单份 `configs/v5/fusion_placement_dev.yaml` 已实现；CPU预检通过100对标注和200张图像摘要，完整CTW/LATeD与Read权重的位置对照已完成。识别器及采样运行异常直接上抛，几何非法裁剪仍纳入CER分母；9项CPU测试通过。
 
 ### Connector：实例、裁剪与Read适配（2026-10-23）
 
@@ -178,64 +178,104 @@ pad1.1表示展开高度增加10%，上下各留原高度5%；相对于pad1的�
 
 完整增强在当前暗光裁剪域优于整体绕过和去噪移除；保留Self-DACE提亮与去噪，暂不增加增强模块。[同权重整体移除](../results/v5/fusion/connector_identity_20261023/paired_comparison.json) / [去噪移除](../results/v5/fusion/connector_no_denoise_20261024_verified/run.json) / [去噪配对统计](../results/v5/fusion/connector_no_denoise_20261024_verified/paired_comparison.json)。这些是推理路径诊断，不代替独立重训消融。采用`_verified`中实际SelfDACE、denoise_present=false的完整记录。
 
-当前保留候选相对最初local_normal，暗光GT CER由72.9193%降到68.9464%、内部spotting F1由4.6512%到5.6304%；同固定中间See的暗光检测F1只有9.7919%，检测漏检仍是当前spotting上限的重要来源。后续优先用完整See权重复核这一连接方案，再决定是否训练裁剪域适配；官方检测评测与终测继续后置。
+当前保留候选相对最初local_normal，暗光GT CER由72.9193%降到68.9464%、内部spotting F1由4.6512%到5.6304%；同固定中间See的暗光检测F1只有9.7919%，检测漏检仍是当前spotting上限的重要来源。完整See及裁剪域Read适配的后续结果见2026-10-26表；官方检测评测与终测继续后置。
 
 当前并行推进connector在固定快照上的裁剪、暗光适配与逐实例调试；官方检测评测接入和终测统一后置。完整目标检测权重上的正式融合验收、重训消融、多种子及真实低光终测尚未完成；RLLIE也未实现。正式结论需要完整基线，开发验证不再把等待See作为前置条件。
 
-### 2026-10-25：完整MLT、目标域迁移与Read裁剪适配
+### 完整MLT与Read裁剪适配
 
-固定R4 best、条件轮廓裁剪/pad1.1、同100对开发图；只更换检测权重，未用test。
+固定R4与相同裁剪，完整MLT100在合成开发集的亮光检测F1 44.3206%、暗光6.7669%；旧SynthText109600为33.5616/9.7919%。MLT带来亮光域收益，不能以此声称低光提升。完整目标权重的结果见下方2026-10-26表。
 
-| 检测权重 | 亮光检测F1% | 暗光检测F1% | 暗光检测Recall% | 亮光spotting F1% | 暗光spotting F1% |
-|---|---:|---:|---:|---:|---:|
-| 原SynthText109600 | 33.5616 | 9.7919 | 5.5021 | 15.5822 | 5.6304 |
-| 完整MLT100末权重 | 44.3206 | 6.7669 | 3.7139 | 20.7666 | 4.2607 |
-| LATeD前41轮开发集best（epoch38） | 9.9562 | 14.8936 | 10.5915 | 2.7352 | 4.0619 |
+独立Read适配从R4 best初始化，固定Self-DACE，仅优化原TrOCR LoRA。采用冻结TotalText train的1152张原图与修正候选转写，生成16934张GT亮暗词图；train/dev/test按原图路径及字节隔离，亮暗1:1，pad1.1。训练和选模用量化PNG，最终连接用原图浮点裁剪并保留失败词分母。短程1200步选出best800；后续接2→5→10轮预算。最终best24800仅144个LoRA张量变化，增强器与全部其他张量逐位相同，[权重审计](../results/v5/fusion/read_connector_lora_20261025/long_weight_audit.json)。
 
-三组GT-crop CER相同（亮18.8081%、暗68.9464%），因为Read和裁剪图不变。MLT预训练的亮光泛化提高，不能据此声称低光spotting提升；LATeD提高暗光命中却增加误检，检测命中后读对比例27.27%。LATeD暗光309个原始预测中48个裁剪多截面失败、54个有覆盖多个GT的合并候选；这些是诊断计数，不用GT修正实际推理。完整结果：[MLT](../results/v5/fusion/connector_mlt100_20261025/run.json)、[LATeD](../results/v5/fusion/connector_lated41_20261025/run.json)、[实例关联审计](../results/v5/diagnostics/connector_detector_transfer_20261025.json)。不同目标域的检测分数不代替最终完整权重验收。
+LATeD原step3776的geometry卷积FP16溢出已重放并局部FP32修复，健康3690迁移后续训；八项训练状态保持，原失败和迁移证据保留。GPU2保留DSConv激活使实测吞吐约+12%，显存比例授权.80；数值与结构补丁在独立runtime记录，不改已完成原基线。复现与恢复入口见§5。
 
-因此本轮先保留几何策略与增强器，建立独立裁剪域LoRA训练线：从R4 best初始化，固定Self-DACE，仅优化原TrOCR LoRA；训练图使用冻结TotalText train的1152张原图、修正候选转写，生成16934张亮暗训练词图，训练原图与100对dev/test做路径和字节隔离，亮/合成暗1:1。通过实际connector生成384×384裁剪；PNG量化只用于训练/选模，完整spotting复核仍用原图浮点裁剪，并包含几何失败词。训练属于融合适配，不改独立LSTR基线，也不把该候选标注版本称为官方复现。短程已完成1200步；723张有效暗光dev PNG选模CER从71.6919%降至64.6970%（step800最佳）。PNG量化与直接浮点裁剪的输入不同，不将这组数值与先前68.9464%直接相减；已完成同检测框、原图浮点裁剪的明暗spotting复核，见下表。4个无效GT裁剪在完整复核中继续保留CER分母。
+### 完成后的Read分段对照
 
-| 固定检测器；仅替换Read LoRA | 亮光GT CER%↓ | 暗光GT CER%↓ | 亮光spotting F1%↑ | 暗光spotting F1%↑ |
+同100对TotalText开发图、727个GT词、3977个字符；固定CTW250 best与原裁剪策略，包含4个失败GT裁剪。各行使用对应预算内按PNG-dev CER选出的best，不等同于末轮权重。
+
+| Read预算 | 亮光原图GT CER%↓ | 暗光原图GT CER%↓ | 亮光spotting F1%↑ | 暗光spotting F1%↑ |
 |---|---:|---:|---:|---:|
-| MLT100 + 原R4 | 18.8081 | 68.9464 | 20.7666 | 4.2607 |
-| MLT100 + 裁剪适配短程best800 | **14.0558** | **64.8227** | **21.4634** | 4.2607 |
-| LATeD epoch38 + 原R4 | 18.8081 | 68.9464 | 2.7352 | 4.0619 |
-| LATeD epoch38 + 同适配best800 | **14.0558** | **64.8227** | **3.1729** | **4.4487** |
+| 原独立R4 | 18.8081 | 68.9464 | 16.8731 | 3.0227 |
+| 2轮 | 12.5974 | 60.6990 | 16.5635 | 3.0227 |
+| 5轮 | 11.3151 | 58.7880 | 17.0279 | 3.2746 |
+| 10轮预算，best约5.86轮 | **11.0636** | **57.9583** | **17.1827** | **3.5264** |
 
-暗光CER差−4.1237pp，按原图配对bootstrap95%区间[−5.9034,−2.4282]pp；LATeD框下暗光F1差+0.3868pp，区间[−0.3543,+1.1930]pp跨0。识别改善有证据，端到端增益尚待完整检测权重复核。亮光CER差−4.7523pp；固定MLT框的亮光F1差+0.6969pp，区间跨0。逐项核验只有144个LoRA张量变化，增强器与其他全部张量逐位相同，原R4文件不变。[短程权重审计](../results/v5/fusion/read_connector_lora_20261025/short_weight_audit.json)；稳定快照`short_best.pt`；[MLT复核/配对统计](../results/v5/fusion/connector_mlt100_read_lora_short_20261025/paired_comparison.json)、[LATeD复核/配对统计](../results/v5/fusion/connector_lated41_read_lora_short_20261025/paired_comparison.json)。
+相对原R4，暗光CER下降10.9882pp，按原图配对bootstrap 95%区间[−13.4075,−8.5699]pp；暗光F1提高0.5038pp，区间[0,1.3299]pp。CTW在该合成暗光词级数据上的检测召回仅3.7139%，是当前连接结果的主要限制。完整MLT框下，Read5→10预算的暗光F1保持4.7619%，进一步说明增加识别轮数的边际收益缩小。[Read10原图复核及配对统计](../results/v5/fusion/connector_ctw250_read_epoch10_20261025/paired_comparison.json)。
 
-短程达到预登记扩预算条件：暗光CER改善≥1pp、暗光spotting不降、亮光F1退化≤1pp。长程总预算8468更新（16934词图、batch4、两遍），已从短程接续；用户随后要求优先跑完LATeD，Read暂停在最新健康last，排队到GPU3 CTW后继续，不从头训练。新connector候选仅对原策略仍失败的`multiple_cross_sections`使用凸包边界，正常裁剪不变，并记录`convex_hull_boundary`；CPU连接回归21项通过，实际同权重对照排在Read长程后，在取得增益证据前不替换保留方案。
+扩训练门槛已补齐decoder、detector_hw、exposure及两评测脚本源码一致性检查。实际2/5/10轮配置均一致；新检查回放2→5报告仍通过，新增5个差异子用例均可拦截。独立R4与目标检测权重未改。
 
-LATeD本轮故障为geometry head首卷积有限输入→FP16 Inf→BN NaN。相同批BF16/FP32有限；仅geometry head FP32后，真实完整更新loss2.03157、grad norm8.66608、参数全有限，峰值allocated20.96GiB/reserved23.10GiB。[失败批重放](../results/v5/diagnostics/lated_failed3776_20261025.json) / [反向验证](../results/v5/diagnostics/lated_failed3776_backward_green_20261025.json)。为保留运行中的CTW闭包，修复在独立代码副本`results/v5/runtime/lated_geometry_fp32_20261025/`，[补丁](../experiments/autoresearch/v5/lated_geometry_fp32_20261025.patch)包含源码与回归用例；主目录Seeing未变。新LATeD从健康step3690迁移，model/optimizer/scheduler/scaler/RNG/sampler/loader/state八项保持，MLT初始化另存等权重且拓扑一致的副本。恢复已原序重放失败批、到健康step3900，参数全有限且源码吻合；迁移记录分别在两新检测目录的`numeric_migration.json`。补丁待现有固定权重连接对照完成后统一合入，不能把跨源码迁移称作原闭包exact resume。
+### 检测瓶颈、裁剪来源与结构修正（2026-10-26）
 
-GPU2加速遵照用户新增授权，原batch10和250轮预算保持：同一健康3900批次，原重算稳定均值0.7742秒/步，保留激活0.6911秒/步，吞吐约+12.0%；峰值allocated20.97→34.58GiB，全部参数有限，首个loss相同。减少重算后的浮点梯度有正常数值差异，不称逐位相同训练轨迹。[重算对照](../results/v5/diagnostics/lated_recompute_benchmark_20261025.json) / [保留激活对照](../results/v5/diagnostics/lated_no_recompute_benchmark_20261025.json)。独立副本`lated_geometry_fast_20261025`同时保留几何头FP32修复；内存上限由.35授权为.80，容器RAM24GiB/CPU8/PID512不变，主目录CTW闭包未改；独立加速副本回归20项及5个子测试通过。从健康3900迁移全部八项状态，最佳epoch38也迁移保留；不使用interrupted.pt续训。[加速补丁](../experiments/autoresearch/v5/lated_no_recompute_20261025.patch)、新目录`numeric_migration.json`与`best_migration.json`记录来源。最初启动被旧.35硬限制挡住，调整授权副本后已实际运行，不把失败尝试记为训练完成。
+**See原250轮训练已完成；当前融合的首要限制是漏检，预测框裁剪还造成额外识别损失。** Read独立LSTR基线封存，新增10轮预算的分支属于GT裁剪域适配。训练代码`tools/data/prepare_v5_connector_reading.py`逐个读取标注`gt['poly']`后调用实际connector裁剪，未运行See预测框。它使用相同裁剪算法，但不等于已适配预测框的偏移、合并或漏字。
+
+同100对TotalText开发图、同Read最佳权重、同阈值的完整检测器结果：
+
+| 完整检测器 | 暗光检测Recall% | 暗光检测F1% | 原裁剪E2E F1% | 凸包候选E2E F1% |
+|---|---:|---:|---:|---:|
+| CTW250 best | 3.7139（27/727） | 6.8010 | 3.5264 | 3.7783 |
+| LATeD250 best | **11.4168（83/727）** | **16.8699** | 5.8943 | **7.1138** |
+| MLT100 last | 3.7139（27/727） | 6.7669 | 4.7619 | 5.0125 |
+
+LATeD本域dev best Recall46.0613%、F1 52.7239%，与上述跨域词级开发集分开报告。LATeD/CTW行级目标与TotalText词级目标有粒度差异，合成暗光与真实低光也有域差异；11.42%不能单独证明原论文同协议复现成绩。完整Read+LATeD凸包明光E2E F1 4.3830%，显示该目标域检查点并未兼顾亮光词级泛化。
+
+CER必须在同一批命中文字上配对，不能拿全部727词的GT CER57.9583%与容易被检出的少量词比较：
+
+| 暗光；固定同一Read | 命中词数 | 同批GT框raw CER% | 预测框原裁剪raw CER% | 预测框凸包raw CER% | 凸包后仍有损失/pp |
+|---|---:|---:|---:|---:|---:|
+| CTW250 | 27 | 3.9474 | 28.2895 | 22.3684 | +18.4211 |
+| LATeD250 | 83 | 17.6259 | 43.8849 | 33.0935 | **+15.4676** |
+| MLT100 | 27 | 2.5157 | 13.2075 | 8.1761 | +5.6604 |
+
+LATeD配对差95%原图bootstrap区间[9.0149,22.6948]pp；原裁剪15个命中框失败，凸包后为0。该差同时包含框形状/位置与裁剪采样影响，不能全部归因为Read能力。`cer_on_det`旧字段按lower-alnum归一化，上表统一重新计算raw CER。证据：[同词配对统计](../results/v5/diagnostics/matched_crop_cer_20261025.json)、[完整LATeD连接](../results/v5/fusion/connector_lated250_read10_hull_check_20261025/run.json)。
+
+增强位置复核：固定完整LATeD+Read+凸包，A无增强、B仅crop后增强、C仅检测前增强，暗光Recall依次11.4168/11.4168/9.4911%，E2E F1依次6.7073/7.1138/5.8496%。当前权重下继续采用crop后增强；整图前置增强未减少漏检。CTW三路径暗光F1约3.78%，同样没有前置增强收益。[LATeD位置实验](../results/v5/fusion/lated250_read10_hull_placement_20261025/run.json)。位置队列首轮的第二入口被执行器规则拒绝、未启动；已通过明确runtime入口单独补完，原失败状态保留。
+
+固定LATeD权重的检测图诊断在100对TotalText与100张LATeD开发图完成：
+
+| TotalText暗光干预 | Recall% | F1% | 含义 |
+|---|---:|---:|---|
+| 原输出 | 11.4168 | 16.8699 | 当前实际检测 |
+| 保留所有重建轮廓 | 11.4168 | 16.8699 | 本批300图均无变化，不能以此宣称修复召回 |
+| 只将TCL阈值.5降至.3 | 10.7290 | 14.1176 | 候选增加但误检/合并更多，不采用 |
+| GT分类图+预测几何 | 49.1060 | 50.4947 | 仅作定位；学习到的TR/TCL限制明显 |
+| 预测分类图+GT几何 | 14.3054 | 23.3184 | 几何也有损失 |
+| GT分类+GT几何 | 85.2820 | 87.6945 | 当前标签/重建的理想输入诊断，不是部署成绩 |
+
+上述oracle干预不参与模型或阈值选择。GT几何仅在GT中心带内非零，也会抑制带外候选，因此不能将其F1增量精确归因于几何模块。LATeD额外诊断统一使用融合的RGB浮点resize，与训练内OpenCV uint8 resize略有差异（原F1 52.5335% vs训练dev52.7239%），不把这点差异当训练退化。[检测图诊断](../results/v5/diagnostics/lated250_decoder_maps_verified_20261026/run.json)。
+
+老师本地`/home/gyf/DarkText-private`仅作只读参考，未复制或提交私有源码。实际训练主路径为VGG-FPN/8通道TR-TCL与上下距离、sin/cos；默认关闭图连接，GCN未在TextNet中实例化，不能据文件名认定新版完整方法已接通。可借鉴点包括分类平衡、等弧长边界目标、上下非对称距离；需单因素验证。其预训练失败继续随机初始化、OHEM整型取反、训练/推理形态路径不同等问题不照搬。原Seeing论文明确ResNet50，因此本轮保持ResNet；不直接替换为老师目录的整套模型。
+
+重新核对[论文Fig2](https://arxiv.org/html/2404.08965v3#S2.F2)确认两处连接偏差：F1在全部PM之前分流给SCM；adaptive(F1)应残差相加回F1。旧实现先PM再取SCM且以adaptive替换主干。修正放在独立`results/v5/runtime/lated_fig2_f1_20261026/`，以数值修复/保留激活副本为底应用[结构补丁](../experiments/autoresearch/v5/seeing_fig2_f1_20261026.patch)。补丁不直接应用于旧主目录；先拷贝`lated_geometry_fast_20261025`的tools/seeread/configs再应用，保持已完成基线可读取。回归用真实forward hooks验证SCM接入与残差，旧布局失败、修正版通过，且GT mask不进入主预测。图中C0–C4对应ResNet具体节点和末层尺度尚不唯一，**本轮不推断最终必须stride2**，维持原输出stride4并登记假设。
+
+用户已选优先修Fig2再做分类平衡。GPU2两臂顺序执行：同完整MLT100数值权重、同seed0/batch10/Adam1e-4/数据/增强/5轮450更新，各上限1200秒；重置目标阶段优化器，Read固定best24800。修正版MLT文件只显式更新结构元数据，模型每个张量相同；属于结构warmstart，不能称原闭包exact resume或“修正结构的完整SynthText/MLT复现”。完成后各用本域dev best跑同100对明暗connector。GPU3现有外部任务保持。本轮两处连接作为一组修正共同变化，不分别声称各自的贡献。若有开发收益，再考虑完整修正版预训练与目标训练；预测框Read适配排在检测改善后。[短程对照计划](../experiments/autoresearch/v5/queue_20261026_fig2_layout_short5_gpu2.json)。
 
 ### 训练轮数是否不足（2026-10-25）
 
-当前容器训练和250轮基线预算保持。epoch必须同时看数据量、batch与更新数：本项目SynthText每轮85875次更新，2轮共171750；LATeD每轮90次更新，即使1000轮也只有90000次更新。不能用其他任务“几千轮”的数字判断这里是否欠训练。
+本轮容器训练已完成原定预算。epoch必须同时看数据量、batch与更新数：本项目SynthText每轮85875次更新，2轮共171750；LATeD每轮90次更新，即使1000轮也只有90000次更新。不能用其他任务“几千轮”的数字判断这里是否欠训练。
 
 | 训练线 | 当前预算/观察 | 延长判断 |
 |---|---|---|
 | 独立Read R4/LSTR | 20轮/50740更新；best step36200 dev CER39.7753%，末次50.1642% | 后期已变差；不先盲加轮数，保留原best与独立基线 |
-| Read connector裁剪适配 | 16934词图、batch4；健康2400步约0.57轮，dev CER71.6919%→62.6768%；当前目标8468步/2轮 | 更值得检查欠拟合；先跑完2轮及原图连接复核，再考虑5、10轮分段 |
+| Read connector裁剪适配 | 10轮/42340更新完成；最佳step24800约5.86轮，PNG-dev CER57.7020%，末轮59.6970% | 保留best；5轮→10轮预算的原图CER改善0.8298pp，优先修连接与域适配，不继续盲加轮数 |
 | See CTW | 已完成250轮；epoch87已达54.9801%，最终best55.0292%（epoch217），末轮52.8061% | best增量约0.05pp，有平台迹象；延长须独立对照学习率，不预设千轮有效 |
-| See LATeD | 审计时约79轮，后续约87轮，尚未经历epoch100的第一次学习率下降 | 先完成当前250轮，不能现在判定轮数不足 |
+| See LATeD | 完成250轮；best epoch199 F1 52.7239%，末轮51.7263%；较原epoch38最佳提高1.3489pp | 后期已有平台迹象；下一步检查跨数据域召回与连接，延长需另立学习率对照 |
 
 本地固定Self-DACE源中，`old_version/stage2/train_2stage.py`第141行确有`num_epochs=1000`默认值，对应独立去噪网络训练；new_version的增强阶段也设1000轮。[固定源脚本](https://github.com/John-Wendell/Self-DACE/blob/ec0c033def6c98a97b99c2938e7c8ffc50ba65fd/codes_SelfDACE/old_version/stage2/train_2stage.py#L141)。当前Read加载公共light/denoise权重后再适配OCR，这个1000轮默认值不能直接用作LoRA/联合微调的轮数要求。
 
 Seeing论文§5.1明确列出SynthText2轮、MLT100轮、batch10与250轮训练，并每100轮将学习率乘0.1：[原文](https://arxiv.org/html/2404.08965v3#S5.SS1)。按本地StepLR从1e-4延到1000轮，学习率会降至1e-14；仅改epochs不构成有效长程试验。Reading正文未找到明确epoch配方，不把本地20轮称为作者指定轮数：[原文](https://arxiv.org/html/2604.23685v1)。
 
-补充实验只看固定开发集，原250轮与Read独立基线封存；追加轮数和调整学习率分开登记。本轮grill-me已确认优先Read裁剪域适配。当前2轮及全部连接对照结束后，保持学习率2e-5、batch4、数据、冻结增强器和原LoRA不变，继续到5轮/21170更新；5轮相对2轮在同完整CTW权重上暗光原图GT CER改善≥1pp、暗光E2E F1不降且亮光F1退化≤1pp时，再到10轮/42340更新。各边界使用硬链接保留best/last和报告；不足门槛记为跳过，不把旧结果冒充10轮训练。See当前250轮计划不变。[曲线审计](../results/v5/diagnostics/training_duration_audit_20261025.json)。
+补充实验只看固定开发集，原250轮与Read独立基线封存；追加轮数和调整学习率分开登记。本轮grill-me已确认优先Read裁剪域适配。已保持学习率2e-5、batch4、数据、冻结增强器和原LoRA不变，从2轮接到5轮/21170更新。5轮相对2轮在同完整CTW权重上暗光原图GT CER改善1.9110pp、暗光E2E F1提高0.2519pp、亮光F1提高0.4644pp，满足门槛后继续完成10轮/42340更新。各边界使用硬链接保留best/last和报告；不足门槛记为跳过，不把旧结果冒充10轮训练。See原250轮计划已完成。[曲线审计](../results/v5/diagnostics/training_duration_audit_20261025.json)。
 
 ## 5. 运行和证据入口
 
 | 内容 | 位置 |
 |---|---|
+| 当前Fig2结构短程 | [修正/原结构各5轮](../experiments/autoresearch/v5/queue_20261026_fig2_layout_short5_gpu2.json) / [实时状态](../results/v5/queue_20261026_fig2_layout_short5_gpu2.json)；GPU2串行，GPU3外部任务不触碰 |
 | 检测旧主链/状态 | [DSConv精度恢复计划](../experiments/autoresearch/v5/queue_20261024_detection_dsconv_fp32.json) / [实时状态](../results/v5/queue_20261024_detection_dsconv_fp32.json)；MLT完成、LATeD3776中断，恢复见新记录 |
-| LATeD当前长程 | [授权加速计划](../experiments/autoresearch/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json) / [实时状态](../results/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json)；`LATeD_geometry_fast_20261025`，无短程上限 |
-| Read分段延长 | [5→10轮计划](../experiments/autoresearch/v5/queue_20261025_read_5to10_epochs_gpu3.json) / [状态](../results/v5/queue_20261025_read_5to10_epochs_gpu3.json)；等待现有全部对照结束，容器GPU3执行，门槛回归通过 |
-| GPU3后续Read/connector | [CTW后续计划](../experiments/autoresearch/v5/queue_20261025_ctw_then_read_connector_gpu3.json) / [状态](../results/v5/queue_20261025_ctw_then_read_connector_gpu3.json)；等待当前CTW完成后继续Read8468与凸包候选对照；随后[完整CTW连接复核](../experiments/autoresearch/v5/queue_20261025_full_ctw_connector_gpu3.json) |
+| LATeD已完成长程 | [授权加速计划](../experiments/autoresearch/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json) / [实时状态](../results/v5/queue_20261025_lated_fast_authorized_until250_gpu2.json)；`LATeD_geometry_fast_20261025`已完成250轮 |
+| Read分段延长 | [5→10轮计划](../experiments/autoresearch/v5/queue_20261025_read_5to10_epochs_gpu3.json) / [状态](../results/v5/queue_20261025_read_5to10_epochs_gpu3.json)；5轮、10轮均完成，门槛回归通过 |
+| GPU3后续Read/connector | [CTW后续计划](../experiments/autoresearch/v5/queue_20261025_ctw_then_read_connector_gpu3.json) / [状态](../results/v5/queue_20261025_ctw_then_read_connector_gpu3.json)；Read8468与凸包候选对照均完成；[完整CTW连接复核](../experiments/autoresearch/v5/queue_20261025_full_ctw_connector_gpu3.json) |
 | LATeD数值恢复 | [短程计划](../experiments/autoresearch/v5/queue_20261025_lated_geometry_preflight.json) / [状态](../results/v5/queue_20261025_lated_geometry_preflight.json)；`LATeD_geometry_fp32_20261025`，原失败记录保留 |
 | Read裁剪域适配 | [短程计划](../experiments/autoresearch/v5/queue_20261025_connector_read_lora_pilot.json)；输出`results/v5/fusion/read_connector_lora_20261025/` |
 | 检测原主链 | `results/v5/detection/SynthText_dsconv_fp32_20261024/` → `MLT17_dsconv_fp32/` → `LATeD_dsconv_fp32/`；日志 `results/v5/queue_logs/20261024_Seeing_dsconv_fp32_full_chain.log` |
@@ -248,11 +288,11 @@ Seeing论文§5.1明确列出SynthText2轮、MLT100轮、batch10与250轮训练�
 
 ## 6. 到投稿的剩余工作与时间估计
 
-Reading官方test、完整MLT与CTW250均已完成。GPU3继续Read两轮和现有连接复核，随后执行已授权的5轮、条件10轮扩展；GPU2 LATeD还约3.5–4小时。延长阶段沿用原学习率和每200步dev验证，预计5轮增加约40–60分钟，若到10轮再约1–2小时，以实际事件耗时修正。正式评测、多种子和终测另计。
+Reading官方test、完整MLT、CTW250、LATeD250及Read裁剪域10轮预算均已完成。当前GPU2正在执行Fig2连接修正与原结构各5轮的受控训练和连接复核；后续独立重训消融、多种子和正式终测另计。
 
 | 剩余步骤 | 交付证据 | 粗估时间 |
 |---|---|---|
-| 1. 独立基线验收 | Reading已完成锁定test；Seeing继续完整预训练、接通官方LATeD/CTW评测 | 3–7天，取决于检测首次完整结果及官方评测对齐 |
+| 1. 独立基线验收 | Reading已完成锁定test；Seeing训练完成，官方LATeD/CTW评测按用户安排后置 | 3–7天，取决于检测首次完整结果及官方评测对齐 |
 | 2. 固定接口与位置实验 | 同权重A/B/C、暗亮spotting F1、检测指标和GT-crop CER | 1–3天 |
 | 3. 删改与一个连接模块 | 定位主要退化来源；同预算消融证明一个模块的增益 | 1–2周，失败候选会延长 |
 | 4. 完整验证 | 多随机种子、主要消融、泛化及代价；锁定后做最终测试，真实spotting需完成LATeD转写复核 | 1–2周；标注可并行，取决于人力 |

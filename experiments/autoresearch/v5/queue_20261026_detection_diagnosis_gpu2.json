@@ -1,0 +1,24 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "No training. Diagnose completed LATeD target on fixed dev: crop-free detection and map interventions. No official tests.",
+  "jobs": [
+    {
+      "id": "lated250_decoder_maps",
+      "argv": [
+        "python",
+        "tools/v5_probe_detection_maps.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--checkpoint",
+        "results/v5/detection/LATeD_geometry_fast_20261025/best.pt",
+        "--output",
+        "results/v5/diagnostics/lated250_decoder_maps_verified_20261026"
+      ],
+      "report": "results/v5/diagnostics/lated250_decoder_maps_verified_20261026/run.json",
+      "log": "results/v5/queue_logs/20261026_lated250_decoder_maps_verified.log",
+      "timeout_seconds": 3600
+    }
+  ]
+}
