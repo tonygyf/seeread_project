@@ -1,0 +1,30 @@
+{
+  "container": "seeread-v5-gpu3-20261022",
+  "gpu": 3,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Original architecture; single-factor development diagnostic; first450 updates; official test untouched",
+  "jobs": [
+    {
+      "id": "balanced_ce_train5",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_balanced_ce_20261026",
+        "--config",
+        "experiments/autoresearch/v5/lated_balanced_ce_20261026.json",
+        "--allow-reduced-data"
+      ],
+      "report": "results/v5/detection/LATeD_balanced_ce_20261026/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "budget_stop"
+      ],
+      "log": "results/v5/queue_logs/20261026_balanced_ce_train5.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

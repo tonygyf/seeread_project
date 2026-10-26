@@ -1,0 +1,9 @@
+--- a/seeread/v5/seeing_losses.py
++++ b/seeread/v5/seeing_losses.py
+@@ -50 +50 @@
+-        label = F.interpolate(gt['text'][:, None].float(), size=size, mode='nearest')[:, 0].long()
++        label = F.interpolate(gt['scm_text'][:, None].float(), size=size, mode='nearest')[:, 0].long()
+--- a/tools/v5_train_detection.py
++++ b/tools/v5_train_detection.py
+@@ -118,0 +119 @@
++        sample["targets"]["scm_text"] = torch.from_numpy(mask).long()

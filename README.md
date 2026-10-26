@@ -2,6 +2,8 @@
 
 当前主线：**分别复现 Reading 与 Seeing，再验证组合和消融。** 当前状态、论文差距与最新实验统一查看 [04 v5 对齐](docs/04_v5_alignment.md)。
 
+LATeD MVP 已提供[20张试标页](data/derived/v5/lated_mvp_20261026/pilot.html)和[整图识别预览](results/v5/fusion/lated_mvp_preview20_20261026/preview.html)。首批为200张训练＋100张开发，OCR草稿需人工确认；原完整LATeD检测器继续作为主线，退化结构候选保留为实验记录。导入转写、训练及验收命令见[04的MVP入口](docs/04_v5_alignment.md#lated-mvp实施与人工入口2026-10-26)。
+
 ## 文档
 
 | 编号 | 内容 |

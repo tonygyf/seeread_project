@@ -1,0 +1,20 @@
+--- a/seeread/v5/seeing_losses.py
++++ b/seeread/v5/seeing_losses.py
+@@ -17,0 +18,14 @@
++
++
++def _balanced_ce(ce, label, valid):
++    # Diagnostic choice: per-image OHEM, three hard negatives per positive.
++    losses = []
++    for values, truth, keep in zip(ce, label.bool(), valid):
++        positive, negative = keep & truth, keep & ~truth
++        count = int(positive.sum())
++        n_negative = min(int(negative.sum()), 3 * count if count else 100)
++        total = values[positive].sum()
++        if n_negative:
++            total = total + values[negative].topk(n_negative).values.sum()
++        losses.append(total / max(count + n_negative, 1))
++    return torch.stack(losses).mean()
+@@ -39 +53 @@
+-        losses[key] = _masked_mean(ce, valid)
++        losses[key] = _balanced_ce(ce, gt[key], valid)

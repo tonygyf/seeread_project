@@ -1,0 +1,54 @@
+{
+  "container": "seeread-v5-gpu1-20261026",
+  "gpu": 1,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Exploratory25-epoch controlled curves, no adoption from0.096pp short gain; fixedMLT/data/LR/seed; preserve main250epoch best",
+  "jobs": [
+    {
+      "id": "balanced_ce_25epochs",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_balanced_ce_20261026",
+        "--config",
+        "experiments/autoresearch/v5/lated_balanced_ce_25epochs_20261026.json",
+        "--allow-reduced-data",
+        "--resume",
+        "results/v5/detection/LATeD_balanced_ce_20261026/last.pt"
+      ],
+      "report": "results/v5/detection/LATeD_balanced_ce_20261026/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "budget_stop"
+      ],
+      "log": "results/v5/queue_logs/20261026_balanced_ce_25epochs.log",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "original_25epochs",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_geometry_fast_20261025",
+        "--config",
+        "experiments/autoresearch/v5/lated_original_25epochs_20261026.json",
+        "--allow-reduced-data"
+      ],
+      "report": "results/v5/detection/LATeD_original_control25_20261026/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "budget_stop"
+      ],
+      "log": "results/v5/queue_logs/20261026_original_25epochs.log",
+      "timeout_seconds": 3600
+    }
+  ]
+}

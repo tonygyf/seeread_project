@@ -1,0 +1,54 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "SCM final Conv alignment single-factor against completed Fig2 5-epoch control. All retained MLT tensors identical. Old pretraining layout; no official test.",
+  "jobs": [
+    {
+      "id": "scm_linear_train5",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_scm_linear_20261026",
+        "--config",
+        "experiments/autoresearch/v5/lated_scm_linear_short5_20261026.json",
+        "--allow-reduced-data"
+      ],
+      "report": "results/v5/detection/LATeD_scm_linear_short5_20261026/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261026_scm_linear_train5.log",
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "scm_linear_connector",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/lated_scm_linear_20261026",
+        "--task",
+        "connector",
+        "--detector",
+        "results/v5/detection/LATeD_scm_linear_short5_20261026/best.pt",
+        "--reading",
+        "results/v5/fusion/read_connector_lora_20261025/best.pt",
+        "--output",
+        "results/v5/fusion/connector_scm_linear_short5_20261026",
+        "--sampling",
+        "boundary_with_hull_fallback",
+        "--crop-pad",
+        "1.1"
+      ],
+      "report": "results/v5/fusion/connector_scm_linear_short5_20261026/run.json",
+      "log": "results/v5/queue_logs/20261026_scm_linear_connector.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

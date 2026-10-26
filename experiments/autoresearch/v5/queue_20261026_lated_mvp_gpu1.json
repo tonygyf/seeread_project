@@ -1,0 +1,23 @@
+{
+  "container": "seeread-v5-gpu1-20261026",
+  "gpu": 1,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Newly user-authorized idle GPU1; independent capped container; yield own job on external activity",
+  "jobs": [
+    {
+      "id": "lated_mvp_preview20",
+      "argv": [
+        "python",
+        "tools/v5_lated.py",
+        "infer",
+        "--limit",
+        "20",
+        "--output",
+        "results/v5/fusion/lated_mvp_preview20_20261026"
+      ],
+      "report": "results/v5/fusion/lated_mvp_preview20_20261026/run.json",
+      "log": "results/v5/queue_logs/20261026_lated_mvp_preview20.log",
+      "timeout_seconds": 1800
+    }
+  ]
+}

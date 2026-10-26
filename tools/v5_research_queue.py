@@ -1,4 +1,4 @@
-"""Run a fixed V5 experiment list serially on one authorized GPU (2 or 3).
+"""Run a fixed V5 experiment list serially on one authorized GPU.
 
 No shell commands, automatic test-driven tuning, container updates or shared
 service restarts. An external GPU process makes this queue wait or yield its
@@ -44,8 +44,8 @@ def host_container_pids(container):
 
 
 def verify_container(container, gpu=2):
-    if gpu not in (2, 3):
-        raise ValueError('Only physical GPU2 and GPU3 are authorized')
+    if gpu not in (0, 1, 2, 3):
+        raise ValueError('Only this server physical GPU0–3 are authorized')
     info = json.loads(command(['docker', 'inspect', container]))[0]
     limits = info['HostConfig']
     requests = limits.get('DeviceRequests') or []

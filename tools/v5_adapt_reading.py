@@ -40,14 +40,35 @@ def main():
     parser.add_argument('--resume', type=Path)
     parser.add_argument('--max-steps', type=int, default=1200)
     parser.add_argument('--max-seconds', type=float, default=1200)
+    parser.add_argument('--epochs', type=int, help='Independent crop adaptation epoch budget')
+    parser.add_argument('--max-len', type=int, help='Shared line-generation cap, never truncate training labels')
     args = parser.parse_args()
     saved = torch.load(args.parent, map_location='cpu', weights_only=False)
     cfg = adaptation_config(saved, args.parent, args.manifests, args.output)
     cfg['train'].update(max_steps=args.max_steps, max_seconds=args.max_seconds)
+    if args.max_len is not None:
+        if args.max_len < 2:
+            raise ValueError('max-len must be at least two')
+        cfg['recognizer']['max_len'] = args.max_len
+    if args.epochs is not None:
+        if args.epochs < 1:
+            raise ValueError('epochs must be positive')
+        count = sum(bool(line.strip()) for line in (args.manifests / 'train.jsonl').read_text().splitlines())
+        cfg['train']['batch_size'] = 4
+        cfg['train']['max_steps'] = args.epochs * ((count + 3) // 4)
+        cfg['experiment']['epoch_budget'] = args.epochs
 
     def factory(config):
         model = build_pipeline(config)
         model.load_state_dict(saved['model'], strict=True)
+        if args.max_len is not None:
+            if args.max_len > model.recognizer.base.decoder.config.max_position_embeddings:
+                raise ValueError('max-len exceeds the pretrained decoder positional capacity')
+            from seeread.v5.lated_annotations import read_jsonl
+            lengths = [len(model.recognizer.tok(row['text']).input_ids)
+                       for row in read_jsonl(args.manifests / 'train.jsonl')]
+            if not lengths or max(lengths) > args.max_len:
+                raise ValueError('Training line exceeds the shared max-len; select a larger explicit cap')
         names = [name for name, p in model.named_parameters() if p.requires_grad]
         if not names or any('lora_' not in name for name in names):
             raise ValueError('Only recognizer LoRA may train in this controlled adaptation')

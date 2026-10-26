@@ -89,8 +89,13 @@ class QueueSafetyTests(unittest.TestCase):
             verify_container('ours', gpu=3)
             with self.assertRaises(ValueError):
                 verify_container('ours', gpu=2)
+        for gpu in (0, 1):
+            newly_authorized = self.container()
+            newly_authorized[0]['HostConfig']['DeviceRequests'][0]['DeviceIDs'] = [str(gpu)]
+            with patch('tools.v5_research_queue.command', return_value=json.dumps(newly_authorized)):
+                verify_container('ours', gpu=gpu)
         with self.assertRaises(ValueError):
-            verify_container('ours', gpu=1)
+            verify_container('ours', gpu=4)
         with patch('tools.v5_research_queue.command', return_value='123\n456') as command:
             self.assertEqual(gpu_processes(3), {123, 456})
             self.assertEqual(command.call_args.args[0][2], '3')

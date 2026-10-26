@@ -1,0 +1,77 @@
+{
+  "experiment": {
+    "version": 5,
+    "role": "scm_target single-factor diagnostic; fixed original MLT100 parent; first5epochs before extension; not author implementation"
+  },
+  "stage": {
+    "name": "target",
+    "epochs": 250,
+    "init_checkpoint": "results/v5/detection/MLT17_geometry_fast_20261025/last.pt"
+  },
+  "detector": {
+    "type": "seeing",
+    "channels": 256,
+    "pretrained": true,
+    "source_root": "/opt/dscnet",
+    "kernel_size": 9
+  },
+  "data": {
+    "root": "data",
+    "train_manifest": "data/annotations/v5/detection/latedspot_train.jsonl",
+    "dev_manifest": "data/annotations/v5/detection/latedspot_val.jsonl",
+    "protocol_provenance": "data/annotations/v5/detection/provenance.json",
+    "image_fingerprints": "data/annotations/v5/detection/image_fingerprints.jsonl",
+    "require_fingerprint": true,
+    "image_hw": [
+      640,
+      640
+    ],
+    "feature_hw": [
+      160,
+      160
+    ],
+    "center_shrink": 0.3,
+    "augment": {
+      "flip_p": 0.5,
+      "rotate_p": 0.5,
+      "rotate_degrees": 10.0,
+      "color_p": 0.5,
+      "color_strength": 0.2,
+      "noise_p": 0.3,
+      "noise_std": 0.02,
+      "scale_crop_p": 1.0,
+      "scale_min": 0.75,
+      "scale_max": 1.5
+    }
+  },
+  "train": {
+    "device": "cuda:0",
+    "out_dir": "results/v5/detection/LATeD_scm_target_20261026",
+    "seed": 0,
+    "memory_fraction": 0.8,
+    "max_seconds": 1200,
+    "max_steps": 450,
+    "batch_size": 10,
+    "val_batch_size": 2,
+    "workers": 4,
+    "lr": 0.0001,
+    "lr_step_epochs": 100,
+    "lr_gamma": 0.1,
+    "amp": true,
+    "grad_clip": 5.0,
+    "val_every_epochs": 1,
+    "save_every_updates": 200,
+    "log_every": 20
+  },
+  "decoder": {
+    "text_threshold": 0.5,
+    "center_threshold": 0.5,
+    "rectangle_width": 6.0,
+    "sample_step": 3.0,
+    "max_samples": 64,
+    "close_kernel": 3,
+    "min_component_area": 3,
+    "min_polygon_area": 3,
+    "max_detections": 100
+  }
+}

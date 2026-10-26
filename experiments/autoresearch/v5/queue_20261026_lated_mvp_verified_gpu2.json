@@ -1,0 +1,21 @@
+{
+  "container": "seeread-v5-run-20261020b",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Verify final whole-image MVP CLI and source-bound outputs on all100 dev images; no reviewed truth yet",
+  "jobs": [
+    {
+      "id": "lated_mvp_verified100",
+      "argv": [
+        "python",
+        "tools/v5_lated.py",
+        "infer",
+        "--output",
+        "results/v5/fusion/lated_mvp_verified_20261026"
+      ],
+      "report": "results/v5/fusion/lated_mvp_verified_20261026/run.json",
+      "log": "results/v5/queue_logs/20261026_lated_mvp_verified100.log",
+      "timeout_seconds": 3600
+    }
+  ]
+}

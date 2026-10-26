@@ -1,0 +1,25 @@
+--- a/seeread/v5/seeing.py
++++ b/seeread/v5/seeing.py
+@@ -69 +69,3 @@
+-        self.decoder = nn.Sequential(cbr(channels, channels), cbr(channels, channels))
++        # Fig2 ends the semantic decoder with Conv, before a separate sigmoid head.
++        self.decoder = nn.Sequential(cbr(channels, channels),
++                                     nn.Sequential(nn.Conv2d(channels, channels, 3, padding=1, bias=False)))
+@@ -122 +124 @@
+-                         'post-attention 1x1 projection', 'SCM two-class one-hot mask input',
++                         'post-attention 1x1 projection', 'SCM two-class one-hot mask input', 'SCM decoder Conv-BN-ReLU-Conv; signed auxiliary semantics',
+--- /dev/null
++++ b/tests/v5/test_scm_linear.py
+@@ -0,0 +1,12 @@
++import torch
++from seeread.v5.seeing import SpatialConstraint
++
++def test_scm_semantic_target_keeps_signed_decoder_output():
++    module = SpatialConstraint(4).eval()
++    with torch.no_grad():
++        module.encoder[0].weight.zero_()
++        module.decoder[0][0].weight.fill_(.1)
++        module.decoder[1][0].weight.fill_(-.1)
++        output = module(torch.ones(1, 4, 8, 8), torch.zeros(1, 32, 32, dtype=torch.long))
++    assert (output['scm_sem'] < 0).all(), 'Fig2 final decoder Conv must retain negative semantic values'
++    assert ((output['scm_mask'] >= 0) & (output['scm_mask'] <= 1)).all()
