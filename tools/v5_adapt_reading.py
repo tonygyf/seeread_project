@@ -34,9 +34,11 @@ def adaptation_config(saved, parent, manifest_dir, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mode', choices=('evaluate', 'train'), default='train')
     parser.add_argument('--parent', type=Path, default=Path('results/v5/reading/R4str_joint/best.pt'))
     parser.add_argument('--manifests', type=Path, default=Path('data/annotations/v5/connector_reading_20261025'))
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--data-root', type=Path)
     parser.add_argument('--resume', type=Path)
     parser.add_argument('--max-steps', type=int, default=1200)
     parser.add_argument('--max-seconds', type=float, default=1200)
@@ -45,6 +47,8 @@ def main():
     args = parser.parse_args()
     saved = torch.load(args.parent, map_location='cpu', weights_only=False)
     cfg = adaptation_config(saved, args.parent, args.manifests, args.output)
+    if args.data_root is not None:
+        cfg['data']['root'] = str(args.data_root)
     cfg['train'].update(max_steps=args.max_steps, max_seconds=args.max_seconds)
     if args.max_len is not None:
         if args.max_len < 2:
@@ -66,9 +70,9 @@ def main():
                 raise ValueError('max-len exceeds the pretrained decoder positional capacity')
             from seeread.v5.lated_annotations import read_jsonl
             lengths = [len(model.recognizer.tok(row['text']).input_ids)
-                       for row in read_jsonl(args.manifests / 'train.jsonl')]
+                       for split in ('train', 'dev') for row in read_jsonl(args.manifests / f'{split}.jsonl')]
             if not lengths or max(lengths) > args.max_len:
-                raise ValueError('Training line exceeds the shared max-len; select a larger explicit cap')
+                raise ValueError('Train/dev line exceeds the shared max-len; select a larger explicit cap')
         names = [name for name, p in model.named_parameters() if p.requires_grad]
         if not names or any('lora_' not in name for name in names):
             raise ValueError('Only recognizer LoRA may train in this controlled adaptation')
@@ -77,8 +81,8 @@ def main():
             initialization='independent R4 best; new optimizer/sampler; fixed enhancer')
         return model
 
-    report = run(cfg, 'train', 'cuda:0', pipeline_factory=factory, resume=args.resume)
-    print(json.dumps(dict(status=report['status'], state=report['state'])), flush=True)
+    report = run(cfg, args.mode, 'cuda:0', pipeline_factory=factory, resume=args.resume)
+    print(json.dumps(dict(status=report['status'], state=report.get('state'), result=report.get('result'))), flush=True)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,8 @@
 <html lang="zh-CN"><meta charset="utf-8"><title>LATeD 文字行人工复核</title>
 <style>
 body{font:16px system-ui;background:#15202b;color:#eee;margin:24px;max-width:1200px} input,select,button,textarea{font:inherit;padding:8px;margin:5px} textarea{width:95%;height:90px} img{max-width:100%;background:#111} .comparison{display:flex;flex-wrap:wrap;gap:16px}.comparison figure{flex:1;min-width:250px;margin:12px 0}.comparison img{max-height:360px;object-fit:contain;cursor:zoom-in} #context{max-height:440px} .muted{color:#acbaca} button{cursor:pointer} #progress{float:right} details{margin:12px 0}.ocr{white-space:pre-wrap;overflow-wrap:anywhere;background:#203141;padding:12px;min-height:24px}
+.workbench{background:#203141;border:1px solid #567;padding:12px;margin-top:12px}.view-controls{display:flex;flex-wrap:wrap;gap:4px}.view-controls label{font-size:14px;display:inline-flex;align-items:center;gap:3px}.view-controls input[type=range]{width:105px;padding:0}.view-controls output{min-width:36px}.view-controls select{max-width:280px}.view-controls button{font-size:14px;padding:5px}#human_viewport{overflow:auto;max-height:580px;min-height:180px;background:#080d12;cursor:grab}#human_canvas{display:block;max-width:none}body.wide{max-width:none}body.wide #human_viewport{max-height:75vh}#human_message{margin:6px 0;font-size:14px}
+body{max-width:1600px}.review-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}.annotation-panel{position:sticky;top:12px}.annotation-panel .comparison{gap:0}.annotation-panel figure{margin:8px 0}.annotation-panel textarea{box-sizing:border-box;width:100%;margin:5px 0;height:120px}#human_canvas{margin:0 auto}@media(max-width:1050px){.review-layout{display:block}.annotation-panel{position:static}}
 </style>
 <h2>LATeD 文字行复核 <span id="progress"></span></h2>
 <svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="view_gamma" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="gamma_r" type="gamma" exponent="0.4"/><feFuncG id="gamma_g" type="gamma" exponent="0.4"/><feFuncB id="gamma_b" type="gamma" exponent="0.4"/></feComponentTransfer></filter></svg>
@@ -9,11 +11,36 @@ body{font:16px system-ui;background:#15202b;color:#eee;margin:24px;max-width:120
 <label>复核人 <input id="reviewer" placeholder="姓名或标注员编号"></label>
 <label>跳转行 <input id="jump" type="number" min="1" style="width:80px"><button id="go">跳转</button></label>
 <div id="identity"></div>
+<div class="review-layout"><div>
+<section class="workbench" aria-label="人工可读性调节工作台">
+<div class="view-controls"><label>人眼参考 <select id="human_source"></select></label><button id="human_wide">扩大工作区</button><button id="human_reset">恢复本行默认</button><label><input id="human_outline" type="checkbox" checked>标出本行轮廓</label></div>
+<div class="view-controls">
+<label>曝光EV <input id="human_ev" type="range" min="-4" max="6" step="0.1" value="0"><output id="human_ev_value"></output></label>
+<label>γ <input id="human_gamma" type="range" min="0.15" max="2.5" step="0.05" value="1"><output id="human_gamma_value"></output></label>
+<label>对比 <input id="human_contrast" type="range" min="0.3" max="3" step="0.05" value="1"><output id="human_contrast_value"></output></label>
+<label>去噪 <input id="human_denoise" type="range" min="0" max="1" step="0.1" value="0"><output id="human_denoise_value"></output></label>
+<label>锐度 <input id="human_sharp" type="range" min="0" max="3" step="0.1" value="0"><output id="human_sharp_value"></output></label>
+<label>通道 <select id="human_channel"><option value="rgb">彩色</option><option value="gray">灰度</option><option value="red">红通道</option><option value="green">绿通道</option><option value="blue">蓝通道</option></select></label><label><input id="human_invert" type="checkbox">反色</label>
+</div>
+<div class="view-controls">
+<button id="human_left">左转90°</button><button id="human_right">右转90°</button>
+<label>角度 <input id="human_angle" type="range" min="-180" max="180" step="0.1" value="0"><output id="human_angle_value"></output></label>
+<label>放大 <input id="human_zoom" type="range" min="25" max="800" step="1" value="100"><output id="human_zoom_value"></output></label><button id="human_fit">适应窗口</button><button id="human_native">原始像素</button><label><input id="human_pixels" type="checkbox">像素格显示</label>
+</div>
+<p id="human_message" role="status">正在加载人眼参考…</p>
+<div id="human_viewport" tabindex="0" aria-label="可滚动、拖动的文字行预览"><canvas id="human_canvas"></canvas></div>
+<p class="muted" style="font-size:14px;margin-bottom:0">切换“数据包亮版／自动曝光／局部对比／去噪锐化／Retinex”找最清楚的版本。100%为适应窗口，可继续放大并拖动；角度可细调。调节按行记忆，不改OCR或转写；以原图、亮版和上下文共同核对，无法确认的字先留待复核。</p>
+</section>
+<details><summary>原始裁剪与Self-DACE对照</summary>
 <div class="comparison">
-<figure><figcaption>原图文字行（点击查看大图）</figcaption><a id="crop_link" target="_blank" rel="noopener"><img id="crop" alt="原图文字行裁剪"></a></figure>
+<p id="quality_hint" role="status"></p>
+<figure><figcaption>原图文字行（点击查看大图）</figcaption><a id="crop_link" target="_blank" rel="noopener"><img id="crop" loading="lazy" alt="原图文字行裁剪"></a></figure>
 <figure><figcaption>LLE 增强对照（仅辅助人眼）</figcaption><label>显示提亮 γ <input id="gamma" type="range" min="0.2" max="1" step="0.05" value="0.4"><output id="gamma_value">0.4</output>（1为原增强亮度）</label><a id="lle_link" target="_blank" rel="noopener"><img id="lle" alt="Self-DACE增强文字行" style="filter:url(#view_gamma)"></a><p id="lle_state" class="muted"></p></figure>
 </div>
-<details><summary>原图上下文（黄色编号对应文字行）</summary><img id="context" alt="原图上下文"></details>
+</details>
+<details><summary>提亮上下文（编号对应文字行，可点击看大图）</summary><a id="context_human_link" target="_blank" rel="noopener"><img id="context_human" loading="lazy" alt="数据包亮版上下文"></a></details>
+<details><summary>原图上下文（黄色编号对应文字行）</summary><img id="context" loading="lazy" alt="原图上下文"></details>
+</div><aside class="annotation-panel" aria-label="转写与审核">
 <div class="comparison">
 <figure><figcaption>原图 OCR（绕过增强器，同一识别器）</figcaption><div class="ocr" id="draft_raw"></div><button id="use_raw">采用原图OCR</button></figure>
 <figure><figcaption>增强 OCR（现有 Self-DACE＋Read）</figcaption><div class="ocr" id="draft_enhanced"></div><button id="use_enhanced">采用增强OCR</button></figure>
@@ -24,6 +51,7 @@ body{font:16px system-ui;background:#15202b;color:#eee;margin:24px;max-width:120
 <textarea id="text" placeholder="人工确认的整行转写；非拉丁字符首批可仅标语言"></textarea>
 <div><button id="previous">保存并上一行</button><button id="next">保存并下一行</button><button id="pending">下一条未审核</button><button id="export">导出审核JSON</button></div>
 <p class="muted">浏览器本地保存；导出后用 finalize_lated.py 导入独立sidecar。草稿不会自动变为“已确认”。原检测标注不会被修改。</p>
+</aside></div>
 <script>
 const ITEMS=__ITEMS__,PROTOCOL=__PROTOCOL__,KEY='lated_review_'+PROTOCOL;
 let stored=JSON.parse(localStorage.getItem(KEY)||'{"annotations":{},"reviewer":""}'),cur=0;
@@ -31,7 +59,7 @@ const el=id=>document.getElementById(id);
 function record(){return stored.annotations[ITEMS[cur].id]||{text:ITEMS[cur].draft||'',language:'unknown',status:'pending'};}
 function save(){if(!ITEMS.length)return;stored.annotations[ITEMS[cur].id]={text:el('text').value.normalize('NFC').trim(),language:el('language').value,status:el('status').value};stored.reviewer=el('reviewer').value.trim();localStorage.setItem(KEY,JSON.stringify(stored));}
 function draftLabel(text,error){return error?'裁剪失败：'+error:text===null||text===undefined?'正在生成，请稍后刷新':text||'（空结果）';}
-function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'增强图正在生成，请稍后刷新。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;}
+function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('quality_hint').textContent=it.quality_hint?.needs_extreme_review?'极端候选：原始裁剪像素几乎无变化，请结合上下文确认；尚未删除。':'OCR识错不代表看不清：可读的倾斜、环绕文字请保留。';el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'增强图正在生成，请稍后刷新。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;showHuman();}
 el('reviewer').value=stored.reviewer;
 el('previous').onclick=()=>{save();cur--;show();};el('next').onclick=()=>{save();cur++;show();};el('go').onclick=()=>{save();cur=Number(el('jump').value)-1;show();};
 function adopt(key){el('text').value=ITEMS[cur][key]||'';el('status').value='pending';save();}
@@ -40,5 +68,82 @@ el('gamma').oninput=()=>{for(let c of ['r','g','b'])el('gamma_'+c).setAttribute(
 for(let k of ['text','language','status','reviewer'])el(k).oninput=save;
 el('pending').onclick=()=>{save();for(let n=1;n<=ITEMS.length;n++){let i=(cur+n)%ITEMS.length;if((stored.annotations[ITEMS[i].id]?.status||'pending')==='pending'){cur=i;break;}}show();};
 el('export').onclick=()=>{save();if(!stored.reviewer){alert('请填写复核人');return;}let annotations=ITEMS.map(it=>({id:it.id,...(stored.annotations[it.id]||{text:'',language:'unknown',status:'pending'})}));let payload={protocol_sha256:PROTOCOL,reviewer:stored.reviewer,annotations};let a=document.createElement('a');let url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download='lated_review_'+PROTOCOL.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+const VIEWKEY=KEY+'_display_auto2',viewPrefs=JSON.parse(localStorage.getItem(VIEWKEY)||'{}');
+const viewFields=['source','ev','gamma','contrast','denoise','sharp','channel','invert','angle','zoom','pixels','outline'];
+const checks=new Set(['invert','pixels','outline']);
+const sourceNames={auto:'自动推荐：已逐行选图调参',balanced:'亮版逐行自动调光',bright:'数据包自带亮版',expanded:'亮版扩边上下文',exposure:'原图自动曝光',local:'原图局部对比（CLAHE）',detail:'亮版去噪＋锐化',retinex:'原图Retinex灰度',original:'原图像素',lle:'Self-DACE增强'};
+let availableViews={},basePixels=null,loadSerial=0,paintTimer=null;
+const toneCanvas=document.createElement('canvas'),blurCanvas=document.createElement('canvas');
+function defaults(){const h=ITEMS[cur].human;return {source:h?.views?.auto?'auto':h?.views?.balanced?'balanced':h?'bright':'original',ev:0,gamma:1,contrast:1,denoise:0,sharp:0,channel:'rgb',invert:false,angle:h?.recommendation?.angle||0,zoom:100,pixels:false,outline:true};}
+function currentView(){return Object.fromEntries(viewFields.map(k=>[k,checks.has(k)?el('human_'+k).checked:el('human_'+k).value]));}
+function rememberView(){viewPrefs[ITEMS[cur].id]=currentView();localStorage.setItem(VIEWKEY,JSON.stringify(viewPrefs));}
+function showHuman(){
+ const it=ITEMS[cur];availableViews={...(it.human?.views||{}),original:it.crop};if(it.lle_crop)availableViews.lle=it.lle_crop;
+ if(availableViews.auto)availableViews={auto:availableViews.auto,...availableViews};
+ const select=el('human_source');select.replaceChildren();
+ for(const key of Object.keys(availableViews)){const option=document.createElement('option');option.value=key;option.textContent=sourceNames[key];select.appendChild(option);}
+ const state={...defaults(),...(viewPrefs[it.id]||{})};if(!availableViews[state.source])state.source='original';
+ for(const k of viewFields){if(checks.has(k))el('human_'+k).checked=state[k];else el('human_'+k).value=state[k];}
+ const context=it.human?.context||it.context;el('context_human').src=context;el('context_human_link').href=context;
+ el('human_reset').textContent=it.human?.recommendation?'采用自动推荐':'恢复本行默认';
+ loadHuman();
+}
+function loadHuman(){
+ const serial=++loadSerial;clearTimeout(paintTimer);basePixels=null;
+ el('human_canvas').getContext('2d').clearRect(0,0,el('human_canvas').width,el('human_canvas').height);
+ el('human_message').textContent='正在加载原始分辨率参考…';
+ const img=new Image();
+ img.onload=()=>{if(serial!==loadSerial)return;toneCanvas.width=img.naturalWidth;toneCanvas.height=img.naturalHeight;const context=toneCanvas.getContext('2d',{willReadFrequently:true});context.drawImage(img,0,0);basePixels=context.getImageData(0,0,toneCanvas.width,toneCanvas.height);paintHuman();};
+ img.onerror=()=>{if(serial===loadSerial)el('human_message').textContent='参考图加载失败，请刷新或切换原图；人工转写已保留。';};
+ img.src=availableViews[el('human_source').value];
+}
+function viewFit(){const canvas=el('human_canvas'),viewport=el('human_viewport');return Math.min(Math.max(1,viewport.clientWidth-2)/canvas.width,(parseFloat(getComputedStyle(viewport).maxHeight)-2)/canvas.height);}
+function fitHuman(){
+ const canvas=el('human_canvas'),viewport=el('human_viewport');
+ if(!canvas.width)return;
+ const fit=viewFit();
+ canvas.style.width=(canvas.width*fit*Number(el('human_zoom').value)/100)+'px';canvas.style.height='auto';
+ canvas.style.imageRendering=el('human_pixels').checked?'pixelated':'auto';
+ el('human_zoom_value').textContent=el('human_zoom').value+'%';
+}
+function paintHuman(){
+ if(!basePixels)return;
+ const s=currentView(),w=basePixels.width,h=basePixels.height,gain=2**Number(s.ev),gamma=Number(s.gamma),contrast=Number(s.contrast);
+ const lut=new Uint8ClampedArray(256);
+ for(let k=0;k<256;k++){let v=(Math.pow(Math.min(1,k*gain/255),gamma)*255-127.5)*contrast+127.5;lut[k]=s.invert?255-Math.max(0,Math.min(255,v)):v;}
+ const ctx=toneCanvas.getContext('2d',{willReadFrequently:true}),image=ctx.createImageData(w,h),data=image.data,src=basePixels.data;
+ for(let i=0;i<src.length;i+=4){
+  let r=src[i],g=src[i+1],b=src[i+2];
+  if(s.channel!=='rgb'){const v=s.channel==='red'?r:s.channel==='green'?g:s.channel==='blue'?b:Math.round(.299*r+.587*g+.114*b);r=g=b=v;}
+  data[i]=lut[r];data[i+1]=lut[g];data[i+2]=lut[b];data[i+3]=255;
+ }
+ ctx.putImageData(image,0,0);
+ function blurPixels(){blurCanvas.width=w;blurCanvas.height=h;const c=blurCanvas.getContext('2d',{willReadFrequently:true});c.filter='blur(0.8px)';c.drawImage(toneCanvas,0,0);return c.getImageData(0,0,w,h).data;}
+ if(Number(s.denoise)>0){const low=blurPixels(),a=Number(s.denoise);for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)data[i+c]=data[i+c]*(1-a)+low[i+c]*a;ctx.putImageData(image,0,0);}
+ if(Number(s.sharp)>0){const low=blurPixels(),a=Number(s.sharp);for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)data[i+c]+=a*(data[i+c]-low[i+c]);ctx.putImageData(image,0,0);}
+ const angle=Number(s.angle)*Math.PI/180,cos=Math.abs(Math.cos(angle)),sin=Math.abs(Math.sin(angle));
+ const canvas=el('human_canvas');canvas.width=Math.max(1,Math.ceil(w*cos+h*sin));canvas.height=Math.max(1,Math.ceil(w*sin+h*cos));
+ const target=canvas.getContext('2d');target.fillStyle='#202832';target.fillRect(0,0,canvas.width,canvas.height);target.translate(canvas.width/2,canvas.height/2);target.rotate(angle);target.translate(-w/2,-h/2);target.drawImage(toneCanvas,0,0);
+ const human=ITEMS[cur].human;
+ if(s.outline&&human){const frame=human.view_bbox?.[s.source]||human.bbox,sx=w/(frame[2]-frame[0]),sy=h/(frame[3]-frame[1]),dx=human.bbox[0]-frame[0],dy=human.bbox[1]-frame[1];target.beginPath();human.poly_local.forEach(([x,y],i)=>i?target.lineTo((x+dx)*sx,(y+dy)*sy):target.moveTo((x+dx)*sx,(y+dy)*sy));target.closePath();target.strokeStyle='#00ffff';target.lineWidth=Math.max(1,w/900);target.stroke();}
+ fitHuman();
+ for(const k of ['ev','gamma','contrast','denoise','sharp','angle'])el('human_'+k+'_value').textContent=s[k];
+ el('human_message').textContent=`${sourceNames[s.source]} ｜ 原始像素 ${w}×${h} ｜ 调节仅用于人眼复核；青色线为当前文字行。`;
+ if(s.source==='auto'){const r=ITEMS[cur].human.recommendation;el('human_message').textContent=`自动推荐基于${sourceNames[r.source]} ｜ 原始像素 ${w}×${h}；推荐图已调参，滑块可继续微调。${Number(s.angle)?'已调整文字方向；倒置时可再旋转180°。':''} 青线标出当前行，自动推荐仍需人眼确认。`;}
+}
+for(const k of viewFields){
+ el('human_'+k).oninput=()=>{rememberView();if(k==='source'){loadHuman();return;}if(k==='zoom'||k==='pixels'){fitHuman();return;}clearTimeout(paintTimer);paintTimer=setTimeout(paintHuman,70);};
+}
+function turnHuman(delta){el('human_angle').value=((Number(el('human_angle').value)+delta+540)%360)-180;rememberView();paintHuman();}
+el('human_left').onclick=()=>turnHuman(-90);el('human_right').onclick=()=>turnHuman(90);
+el('human_reset').onclick=()=>{delete viewPrefs[ITEMS[cur].id];localStorage.setItem(VIEWKEY,JSON.stringify(viewPrefs));showHuman();};
+el('human_fit').onclick=()=>{el('human_zoom').value=100;rememberView();fitHuman();};
+el('human_native').onclick=()=>{el('human_zoom').value=Math.min(800,Math.max(25,100/viewFit()));rememberView();fitHuman();el('human_canvas').style.width=el('human_canvas').width+'px';};
+el('human_wide').onclick=()=>{document.body.classList.toggle('wide');el('human_wide').textContent=document.body.classList.contains('wide')?'恢复工作区':'扩大工作区';fitHuman();};
+window.addEventListener('resize',fitHuman);
+let drag=null;const viewport=el('human_viewport');
+viewport.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};viewport.setPointerCapture(e.pointerId);};
+viewport.onpointermove=e=>{if(drag){viewport.scrollLeft=drag.left+drag.x-e.clientX;viewport.scrollTop=drag.top+drag.y-e.clientY;}};
+viewport.onpointerup=viewport.onpointercancel=()=>{drag=null;};
 show();
 </script></html>
