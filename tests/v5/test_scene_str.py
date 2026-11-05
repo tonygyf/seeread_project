@@ -45,6 +45,14 @@ class SceneSTRTests(unittest.TestCase):
                 self.assertEqual(row['text'], 'HELLO')
                 self.assertEqual(row['split'], 'train')
                 self.assertTrue((root/row['image']).exists())
+            sidecar.write_text(json.dumps(dict(schema='lated_transcription_sidecar_v1',
+                protocol_sha256=sha256(package/'protocol.json'), annotations=annotations[:1])))
+            subprocess.run([sys.executable, tool, 'export', '--package', str(package), '--sidecar', str(sidecar),
+                            '--allow-partial', '--method', 'axis_aligned', '--output', str(root/'partial')],
+                           check=True, capture_output=True)
+            self.assertEqual((root/'partial'/'dev.jsonl').read_text(), '')
+            self.assertEqual(json.loads((root/'partial'/'protocol.json').read_text())['mode'], 'partial_annotation_diagnostic')
+
 
     def test_ocr_zero_confidence_and_special_text_remain_reviewable(self):
         from seeread.v5.lated_annotations import render_pages

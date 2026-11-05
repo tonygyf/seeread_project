@@ -24,6 +24,7 @@ def main():
     e.add_argument('--output', type=Path, required=True)
     e.add_argument('--method', choices=('axis_aligned', 'boundary_when_supported'), required=True)
     e.add_argument('--pilot', action='store_true')
+    e.add_argument('--allow-partial', action='store_true', help='Reviewed subset diagnostic only; pending text remains ineligible')
     q = sub.add_parser('review-quality')
     q.add_argument('--package', type=Path, required=True)
     q.add_argument('--output', type=Path, required=True)
@@ -99,7 +100,9 @@ def main():
     else:
         protocol, _ = verify_package(args.package)
         root = Path(protocol['data_root'])
-        sources = {s: labelled_rows(args.package, args.sidecar, s, pilot=args.pilot) for s in ('train', 'dev')}
+        sources = {s: labelled_rows(args.package, args.sidecar, s, pilot=args.pilot, require_complete=not args.allow_partial) for s in ('train', 'dev')}
+        if args.allow_partial:
+            sources = {s: [row for row in rows if any(g.get('transcription_status') in ('reviewed','unreadable') for g in row['instances'])] for s, rows in sources.items()}
         audit_splits(root, sources)
         image_dir = root / 'derived/v5/scene_str' / args.output.name
         if image_dir.exists():
@@ -111,9 +114,12 @@ def main():
             write_jsonl(args.output / f'{split}.jsonl', words)
             write_jsonl(args.output / f'{split}.catalog.jsonl', catalog)
             counts[split] = dict(eligible=sum(r['eligible'] for r in catalog), exported=len(words), all_instances=len(catalog))
-        datasets = [WordCropDataset(args.output / f'{s}.jsonl', root, s) for s in ('train', 'dev')]
-        check_disjoint(*datasets)
-        result = dict(status='ready', mode='pilot' if args.pilot else 'reviewed_package', counts=counts,
+        datasets = [WordCropDataset(args.output / f'{s}.jsonl', root, s) for s in ('train', 'dev') if counts[s]['exported']]
+        if len(datasets)==2:
+            check_disjoint(*datasets)
+        elif not args.allow_partial:
+            raise ValueError('Both train/dev need eligible reviewed text')
+        result = dict(status='ready', mode='partial_annotation_diagnostic' if args.allow_partial else ('pilot' if args.pilot else 'reviewed_package'), counts=counts,
                       root=str(root), method=args.method, package_sha256=sha256(args.package / 'protocol.json'),
                       sidecar_sha256=sha256(args.sidecar), filtering='none; human readability defines transcription eligibility',
                       selection='all eligible dev references, including failed crops as empty predictions',

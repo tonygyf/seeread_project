@@ -10,7 +10,7 @@ body{max-width:1600px}.review-layout{display:grid;grid-template-columns:minmax(0
 <p>完整包为900张训练图＋100张开发图；pilot.html保留20张试标。语言需重新确认；OCR仅是草稿。保持大小写、标点和行内空格；整行含其他文字选“混合”，不要删去其他语言后当英文真值。看不清与未审核分别记录。</p>
 <label>复核人 <input id="reviewer" placeholder="姓名或标注员编号"></label>
 <label>跳转行 <input id="jump" type="number" min="1" style="width:80px"><button id="go">跳转</button></label>
-<label>审核顺序 <select id="review_order"><option value="original">原始顺序</option><option value="low">OCR置信度从低到高</option><option value="high">OCR置信度从高到低</option></select></label><span id="batch_state" class="muted"></span>
+<label>审核顺序 <select id="review_order"><option value="original">原始顺序</option><option value="low">OCR置信度从低到高</option><option value="high">OCR置信度从高到低</option></select></label><span id="batch_state" class="muted"></span><span id="sync_state" class="muted" style="display:block"></span>
 <div id="identity"></div>
 <div class="review-layout"><div>
 <section class="workbench" aria-label="人工可读性调节工作台">
@@ -64,7 +64,14 @@ localStorage.setItem(KEY,JSON.stringify(stored));
 
 const el=id=>document.getElementById(id);
 function record(){return stored.annotations[ITEMS[cur].id]||{text:ITEMS[cur].draft||'',language:'unknown',status:'pending'};}
-function save(){if(!ITEMS.length)return;stored.annotations[ITEMS[cur].id]={text:el('text').value.normalize('NFC').trim(),language:el('language').value,status:el('status').value};stored.reviewer=el('reviewer').value.trim();localStorage.setItem(KEY,JSON.stringify(stored));}
+let syncTimer=null;
+async function syncReview(){
+ const annotations=Object.entries(stored.annotations).filter(([id])=>validIds.has(id)).map(([id,row])=>({id,...row}));
+ if(!annotations.length){el('sync_state').textContent='本浏览器尚无审核记录，未发送空备份。';return;}
+ const payload={protocol_sha256:PROTOCOL,reviewer:stored.reviewer,annotations};
+ try{el('sync_state').textContent='正在备份到服务器…';const response=await fetch('/api/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!response.ok)throw Error('HTTP '+response.status);const result=await response.json();el('sync_state').textContent=`服务器已备份 ${result.reviewed_total} 条审核；浏览器本地记录同时保留。`;}catch(error){el('sync_state').textContent='服务器暂未备份，浏览器记录仍保留；可导出JSON。'+error.message;}
+}
+function save(){if(!ITEMS.length)return;stored.annotations[ITEMS[cur].id]={text:el('text').value.normalize('NFC').trim(),language:el('language').value,status:el('status').value};stored.reviewer=el('reviewer').value.trim();localStorage.setItem(KEY,JSON.stringify(stored));clearTimeout(syncTimer);syncTimer=setTimeout(syncReview,800);}
 function draftLabel(text,error){return error?'裁剪失败：'+error:text===null||text===undefined?'本行无历史Read候选，请使用上方Paddle草稿':text||'（空结果）';}
 function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();showCandidates(it);el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('quality_hint').textContent=it.quality_hint?.needs_extreme_review?'极端候选：原始裁剪像素几乎无变化，请结合上下文确认；尚未删除。':'OCR识错不代表看不清：可读的倾斜、环绕文字请保留。';el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'本行无历史Self-DACE对照，请使用工作台中的数据包亮版。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;showHuman();}
 
@@ -168,4 +175,5 @@ viewport.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY,left:viewport.scrollLef
 viewport.onpointermove=e=>{if(drag){viewport.scrollLeft=drag.left+drag.x-e.clientX;viewport.scrollTop=drag.top+drag.y-e.clientY;}};
 viewport.onpointerup=viewport.onpointercancel=()=>{drag=null;};
 show();
+setTimeout(syncReview,500);
 </script></html>

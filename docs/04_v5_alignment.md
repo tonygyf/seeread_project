@@ -45,3 +45,14 @@ python tools/v5_scene_str.py score --catalog /workspace/data/annotations/v5/scen
 
 
 11月5日完整OCR预填验收：1000图、9115行全部覆盖，共91020候选，约19分钟完成，置信度0至0.999984全部保留。19行最佳草稿为空；65行校正失败仍有8个外接裁剪候选，其余每行10候选。不自动确认任何人工转写。完整页面已包含每行候选，GPU2 OCR任务成功退出并释放，GPU3 See训练继续。[覆盖核对报告](/home/gyf/seeread_project/results/v5/diagnostics/lated_1000_completion_audit_20261105.json)。
+
+
+## 378条人工审核的首次固定Read诊断（2026-11-05）
+
+原页面仅localStorage，现同源8765服务新增服务器快照同步，浏览器仍保留本地数据；用户刷新后已收到gyf的275 reviewed+103 unreadable及1 pending。271条可用拉丁转写全部来自32张train原图；3条non_latin单列，1条reviewed未选语言留在原备份、暂缓计分。生成的sidecar和本次测试冻结在 `data/annotations/v5/scene_str_reviewed_20261105/`，不覆盖用户原记录。备份保留最近20个内容快照，页面导出仍可用。
+
+固定未做LATeD适配的R4、相同128-token解码上限；本批真值最长24 tokenizer tokens，无标签截断。原始外接裁剪：271行、2890字符、1995编辑、84行全对，CER69.0311%、整行准确率30.9963%。现有轮廓校正：269行成功、2行失败作空预测，仍以271行计分；2441编辑、74行全对，CER84.4637%、准确率27.3063%。CER差B−A=+15.4325pp；按原图bootstrap95%区间约[−2.7322,+40.2581]pp，样本不足以宣称稳定总体退化。未更新权重。报告 `results/v5/reading/scene_str_reviewed_test_20261105/run.json`，配对及长度分层见同目录 `paired_diagnostic.json`；[逐行图片/人工文字/两种预测对照](http://100.88.81.10:8765/full/read_test/comparison.html)。
+
+原始裁剪分层：≤8字符138行CER33.5252%；9–16字符96行CER57.7679%；>16字符37行CER103.7209%，插入错误可令CER超过100%。这只能说明该人工选择子集长文本较难，不能单独归因为裁剪、低光或长度。当前全部来自train分配，但R4尚未用LATeD训练；属于目标域的冻结模型诊断，不是已适配模型训练成绩，更不是dev/test最终结论。
+
+Read定位是一个已裁出的文字实例→一个字符串，可为单词或单行多词；不是整图多区域检测/阅读顺序模块。弯曲、倾斜、环绕在语义上仍可是一行，当前模型和校正器尚未证明稳健。多行段落需额外行分割/排序协议。当前R4父模型为TrOCR-base-STR，LSTR训练10146/dev1127，LSTR test6588，CER49.5191%；ESTR60留作最终真实低光评测。新LATeD分支900/100/500、拉丁文字范围，现仅有train人工子集。父配置max_len64 tokens，测试128，模型输入统一384×384；长度、分辨率和数据域均需控制。[TrOCR官方用途和预训练来源](https://huggingface.co/microsoft/trocr-base-str)。
