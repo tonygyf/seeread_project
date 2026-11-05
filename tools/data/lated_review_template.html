@@ -7,9 +7,10 @@ body{max-width:1600px}.review-layout{display:grid;grid-template-columns:minmax(0
 </style>
 <h2>LATeD 文字行复核 <span id="progress"></span></h2>
 <svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="view_gamma" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="gamma_r" type="gamma" exponent="0.4"/><feFuncG id="gamma_g" type="gamma" exponent="0.4"/><feFuncB id="gamma_b" type="gamma" exponent="0.4"/></feComponentTransfer></filter></svg>
-<p>先审核 pilot.html 的20张图。语言需重新确认；OCR仅是草稿。保持大小写、标点和行内空格；整行含其他文字选“混合”，不要删去其他语言后当英文真值。看不清与未审核分别记录。</p>
+<p>完整包为900张训练图＋100张开发图；pilot.html保留20张试标。语言需重新确认；OCR仅是草稿。保持大小写、标点和行内空格；整行含其他文字选“混合”，不要删去其他语言后当英文真值。看不清与未审核分别记录。</p>
 <label>复核人 <input id="reviewer" placeholder="姓名或标注员编号"></label>
 <label>跳转行 <input id="jump" type="number" min="1" style="width:80px"><button id="go">跳转</button></label>
+<label>审核顺序 <select id="review_order"><option value="original">原始顺序</option><option value="low">OCR置信度从低到高</option><option value="high">OCR置信度从高到低</option></select></label><span id="batch_state" class="muted"></span>
 <div id="identity"></div>
 <div class="review-layout"><div>
 <section class="workbench" aria-label="人工可读性调节工作台">
@@ -41,25 +42,44 @@ body{max-width:1600px}.review-layout{display:grid;grid-template-columns:minmax(0
 <details><summary>提亮上下文（编号对应文字行，可点击看大图）</summary><a id="context_human_link" target="_blank" rel="noopener"><img id="context_human" loading="lazy" alt="数据包亮版上下文"></a></details>
 <details><summary>原图上下文（黄色编号对应文字行）</summary><img id="context" loading="lazy" alt="原图上下文"></details>
 </div><aside class="annotation-panel" aria-label="转写与审核">
-<div class="comparison">
+<section><h3>PaddleOCR 多候选草稿</h3><div id="paddle_candidates"></div><p class="muted">所有置信度均保留；分数只用于候选排序，不代表文字正确率。点击候选可填入编辑框，状态仍是未审核。</p></section>
+<details><summary>历史 Read 草稿（仅已生成的部分）</summary><div class="comparison">
 <figure><figcaption>原图 OCR（绕过增强器，同一识别器）</figcaption><div class="ocr" id="draft_raw"></div><button id="use_raw">采用原图OCR</button></figure>
 <figure><figcaption>增强 OCR（现有 Self-DACE＋Read）</figcaption><div class="ocr" id="draft_enhanced"></div><button id="use_enhanced">采用增强OCR</button></figure>
 </div>
-<p class="muted">编辑框已预填增强OCR草稿；若为空则采用原图OCR。请对照原图纠错，再选择语言及“已确认”。空结果表示模型未读出文字。</p>
+</details><p class="muted">编辑框优先预填PaddleOCR最高分草稿；已有人工审核不会覆盖。请对照原图纠错，再选择语言及“已确认”。空结果表示模型未读出文字。</p>
 <label>语言 <select id="language"><option value="unknown">待判定</option><option value="latin">英文／拉丁字符及数字</option><option value="non_latin">其他文字</option><option value="mixed">混合文字</option></select></label>
 <label>审核状态 <select id="status"><option value="pending">未审核</option><option value="reviewed">已确认</option><option value="unreadable">无法辨认</option></select></label>
 <textarea id="text" placeholder="人工确认的整行转写；非拉丁字符首批可仅标语言"></textarea>
-<div><button id="previous">保存并上一行</button><button id="next">保存并下一行</button><button id="pending">下一条未审核</button><button id="export">导出审核JSON</button></div>
+<div><button id="previous">保存并上一行</button><button id="next">保存并下一行</button><button id="pending">下一条未审核</button><button id="export">导出审核JSON</button><label>导入旧审核（仅补缺）<input id="import_review" type="file" accept="application/json,.json" style="max-width:220px"></label></div>
 <p class="muted">浏览器本地保存；导出后用 finalize_lated.py 导入独立sidecar。草稿不会自动变为“已确认”。原检测标注不会被修改。</p>
 </aside></div>
 <script>
 const ITEMS=__ITEMS__,PROTOCOL=__PROTOCOL__,KEY='lated_review_'+PROTOCOL;
 let stored=JSON.parse(localStorage.getItem(KEY)||'{"annotations":{},"reviewer":""}'),cur=0;
+const LEGACY=__LEGACY_PROTOCOLS__,OCR_STATE=__OCR_STATE__;
+const validIds=new Set(ITEMS.map(it=>it.id)),originalOrder=new Map(ITEMS.map((it,i)=>[it.id,i]));
+for(const oldProtocol of LEGACY){try{const old=JSON.parse(localStorage.getItem('lated_review_'+oldProtocol)||'null');if(!old)continue;for(const [id,row] of Object.entries(old.annotations||{})){if(validIds.has(id)&&!stored.annotations[id])stored.annotations[id]=row;}if(!stored.reviewer)stored.reviewer=old.reviewer||'';}catch(error){console.warn('历史审核暂未迁移',error);}}
+localStorage.setItem(KEY,JSON.stringify(stored));
+
 const el=id=>document.getElementById(id);
 function record(){return stored.annotations[ITEMS[cur].id]||{text:ITEMS[cur].draft||'',language:'unknown',status:'pending'};}
 function save(){if(!ITEMS.length)return;stored.annotations[ITEMS[cur].id]={text:el('text').value.normalize('NFC').trim(),language:el('language').value,status:el('status').value};stored.reviewer=el('reviewer').value.trim();localStorage.setItem(KEY,JSON.stringify(stored));}
-function draftLabel(text,error){return error?'裁剪失败：'+error:text===null||text===undefined?'正在生成，请稍后刷新':text||'（空结果）';}
-function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('quality_hint').textContent=it.quality_hint?.needs_extreme_review?'极端候选：原始裁剪像素几乎无变化，请结合上下文确认；尚未删除。':'OCR识错不代表看不清：可读的倾斜、环绕文字请保留。';el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'增强图正在生成，请稍后刷新。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;showHuman();}
+function draftLabel(text,error){return error?'裁剪失败：'+error:text===null||text===undefined?'本行无历史Read候选，请使用上方Paddle草稿':text||'（空结果）';}
+function show(){if(!ITEMS.length)return;cur=Math.max(0,Math.min(ITEMS.length-1,cur));let it=ITEMS[cur],r=record();showCandidates(it);el('identity').textContent=`${cur+1}/${ITEMS.length} ｜ ${it.split} ｜ ${it.id} ｜ 图中编号 ${it.instance_index}`;el('quality_hint').textContent=it.quality_hint?.needs_extreme_review?'极端候选：原始裁剪像素几乎无变化，请结合上下文确认；尚未删除。':'OCR识错不代表看不清：可读的倾斜、环绕文字请保留。';el('crop').src=it.crop;el('crop_link').href=it.crop;el('context').src=it.context;el('lle').hidden=!it.lle_crop;if(it.lle_crop){el('lle').src=it.lle_crop;el('lle_link').href=it.lle_crop;}else{el('lle').removeAttribute('src');el('lle_link').removeAttribute('href');}el('lle_state').textContent=it.lle_crop?'增强图可能仍有错觉，请同时核对原图。':'本行无历史Self-DACE对照，请使用工作台中的数据包亮版。';el('draft_raw').textContent=draftLabel(it.draft_raw,it.raw_crop_error);el('draft_enhanced').textContent=draftLabel(it.draft_enhanced,it.enhanced_crop_error);el('use_raw').disabled=it.draft_raw===null||it.draft_raw===undefined||!!it.raw_crop_error;el('use_enhanced').disabled=it.draft_enhanced===null||it.draft_enhanced===undefined||!!it.enhanced_crop_error;for(let k of ['text','language','status'])el(k).value=r[k];el('jump').value=cur+1;let n=ITEMS.filter(x=>(stored.annotations[x.id]?.status||'pending')!=='pending').length;el('progress').textContent=`已审 ${n}/${ITEMS.length}`;showHuman();}
+
+function showCandidates(it){
+ const box=el('paddle_candidates');box.replaceChildren();
+ if(!it.paddle){box.textContent='本行Paddle草稿尚未生成，请稍后刷新；仍可直接人工输入。';return;}
+ const labels={original:'原图',dataset_bright:'数据包亮版',rectified_bright:'GT轮廓校正亮版'};
+ for(const c of [...it.paddle.candidates].sort((a,b)=>b.confidence-a.confidence)){
+  const button=document.createElement('button');button.type='button';button.style.display='block';button.style.textAlign='left';button.style.maxWidth='100%';button.style.whiteSpace='normal';
+  button.textContent=`${(100*c.confidence).toFixed(1)}分 ｜ ${labels[c.view]||c.view} ｜ 旋转${c.rotation}° ｜ ${c.text||'（空结果）'}`;
+  button.onclick=()=>{el('text').value=c.text;el('status').value='pending';save();};box.appendChild(button);
+ }
+}
+el('review_order').onchange=()=>{save();const mode=el('review_order').value;ITEMS.sort((a,b)=>mode==='original'?originalOrder.get(a.id)-originalOrder.get(b.id):(mode==='low'?1:-1)*((a.paddle?.confidence??-1)-(b.paddle?.confidence??-1)));cur=0;show();};
+el('batch_state').textContent=OCR_STATE.expected?`OCR草稿 ${OCR_STATE.completed}/${OCR_STATE.expected} ｜ ${OCR_STATE.status==='complete'?'已生成完成':'正在生成，刷新获取进度'}`:'';
 el('reviewer').value=stored.reviewer;
 el('previous').onclick=()=>{save();cur--;show();};el('next').onclick=()=>{save();cur++;show();};el('go').onclick=()=>{save();cur=Number(el('jump').value)-1;show();};
 function adopt(key){el('text').value=ITEMS[cur][key]||'';el('status').value='pending';save();}
@@ -67,7 +87,9 @@ el('use_raw').onclick=()=>adopt('draft_raw');el('use_enhanced').onclick=()=>adop
 el('gamma').oninput=()=>{for(let c of ['r','g','b'])el('gamma_'+c).setAttribute('exponent',el('gamma').value);el('gamma_value').textContent=el('gamma').value;};
 for(let k of ['text','language','status','reviewer'])el(k).oninput=save;
 el('pending').onclick=()=>{save();for(let n=1;n<=ITEMS.length;n++){let i=(cur+n)%ITEMS.length;if((stored.annotations[ITEMS[i].id]?.status||'pending')==='pending'){cur=i;break;}}show();};
-el('export').onclick=()=>{save();if(!stored.reviewer){alert('请填写复核人');return;}let annotations=ITEMS.map(it=>({id:it.id,...(stored.annotations[it.id]||{text:'',language:'unknown',status:'pending'})}));let payload={protocol_sha256:PROTOCOL,reviewer:stored.reviewer,annotations};let a=document.createElement('a');let url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download='lated_review_'+PROTOCOL.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+el('export').onclick=()=>{save();if(!stored.reviewer){alert('请填写复核人');return;}let annotations=ITEMS.map(it=>({id:it.id,...(stored.annotations[it.id]||{text:'',language:'unknown',status:'pending'})}));let invalid=annotations.find(a=>a.status==='reviewed'&&(a.language==='unknown'||(a.language==='latin'&&!a.text.trim())));if(invalid){cur=ITEMS.findIndex(it=>it.id===invalid.id);show();alert('此行已确认，但尚未选择语言或填写拉丁转写，请补全后导出。');return;}let payload={protocol_sha256:PROTOCOL,reviewer:stored.reviewer,annotations};let a=document.createElement('a');let url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download='lated_review_'+PROTOCOL.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+
+el('import_review').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{const data=JSON.parse(await file.text());if(![PROTOCOL,...LEGACY].includes(data.protocol_sha256)||!Array.isArray(data.annotations))throw Error('审核文件不属于本包或已验证的旧包');const seen=new Set();for(const row of data.annotations){if(!validIds.has(row.id)||seen.has(row.id)||!['pending','reviewed','unreadable'].includes(row.status)||!['unknown','latin','non_latin','mixed'].includes(row.language))throw Error('实例ID或审核字段不匹配');seen.add(row.id);}for(const row of data.annotations){if(!stored.annotations[row.id])stored.annotations[row.id]={text:row.text||'',language:row.language,status:row.status};}if(!stored.reviewer)stored.reviewer=data.reviewer||'';localStorage.setItem(KEY,JSON.stringify(stored));el('reviewer').value=stored.reviewer;show();}catch(error){alert('未导入：'+error.message);}event.target.value='';};
 const VIEWKEY=KEY+'_display_auto2',viewPrefs=JSON.parse(localStorage.getItem(VIEWKEY)||'{}');
 const viewFields=['source','ev','gamma','contrast','denoise','sharp','channel','invert','angle','zoom','pixels','outline'];
 const checks=new Set(['invert','pixels','outline']);

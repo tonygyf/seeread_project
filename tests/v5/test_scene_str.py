@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from seeread.v5.reading import sha256
-from seeread.v5.lated_annotations import write_jsonl
+from seeread.v5.lated_annotations import write_jsonl, render_pages
 from seeread.v5.scene_str import audit_splits, crop_views, export_reviewed, score_catalog, quality_hint, pair_training
 
 
@@ -45,6 +45,25 @@ class SceneSTRTests(unittest.TestCase):
                 self.assertEqual(row['text'], 'HELLO')
                 self.assertEqual(row['split'], 'train')
                 self.assertTrue((root/row['image']).exists())
+
+    def test_ocr_zero_confidence_and_special_text_remain_reviewable(self):
+        from seeread.v5.lated_annotations import render_pages
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'protocol.json').write_text(json.dumps(dict(legacy_review_protocols=['old-protocol'])))
+            write_jsonl(root/'tasks.jsonl', [dict(id='one', pilot=True)])
+            write_jsonl(root/'paddle_drafts.jsonl', [dict(id='one', text='0', confidence=0.,
+                candidates=[dict(view='original', rotation=0, text='</script>0', confidence=0.)],
+                status='machine_draft_not_ground_truth')])
+            render_pages(root)
+            page = (root/'review.html').read_text()
+            data, _ = json.JSONDecoder().raw_decode(page.split('const ITEMS=', 1)[1])
+            self.assertEqual(data[0]['draft'], '0')
+            self.assertEqual(data[0]['paddle']['confidence'], 0.)
+            self.assertEqual(data[0]['paddle']['candidates'][0]['text'], '</script>0')
+            self.assertNotIn('</script>0', page)
+            self.assertNotIn('__LEGACY_PROTOCOLS__', page)
+            self.assertNotIn('__OCR_STATE__', page)
 
     def test_test_difficulty_is_not_changed_by_crop_failures(self):
         catalog = [dict(id='a', text='AB', eligible=True, crop_error=None),

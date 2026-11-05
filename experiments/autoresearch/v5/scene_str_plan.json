@@ -3,24 +3,77 @@
   "status": "prepared_not_launched_awaiting_human_transcriptions",
   "branch": "exp/read-scene-str",
   "parent": "results/v5/reading/R4str_joint/best.pt",
-  "split": {"train_images": 900, "dev_images": 100, "test_images": 500, "unit": "source image; exact-content disjointness checked"},
-  "initial_review": {"package": "data/derived/v5/lated_mvp_20261026", "pilot_images": 20, "package_train_images": 200, "package_dev_images": 100},
+  "split": {
+    "train_images": 900,
+    "dev_images": 100,
+    "test_images": 500,
+    "unit": "source image; exact-content disjointness checked"
+  },
+  "initial_review": {
+    "package": "data/derived/v5/lated_str_1000_20261105",
+    "pilot_images": 20,
+    "package_train_images": 900,
+    "package_dev_images": 100,
+    "previous_package": "data/derived/v5/lated_mvp_20261026"
+  },
   "labels": "human-reviewed Latin text lines; OCR drafts never become truth automatically",
   "eligibility": "retain readable difficult text regardless of OCR; unreadable/non-Latin/ignored reported separately",
   "auto_quality": "near-constant pixels flagged for review; no automatic readability exclusions",
   "test_policy": "no test-driven crop selection or quality filtering; prepare final test transcription after method lock",
   "stages": [
-    {"id": "S0", "action": "verify 20-image review and source-group isolation; audit token lengths before inference"},
-    {"id": "S1", "action": "same frozen R4, compare axis_aligned versus boundary_when_supported; score all eligible references including failed crops"},
-    {"id": "S2", "action": "pair common training IDs, new optimizer for each arm, freeze enhancer and non-LoRA parameters",
-     "batch_size": 4, "lr": 0.00002, "seed": 0, "max_len_initial": 128, "short_resource_check_seconds": 1200,
-     "formal_epochs": 5, "extend_to_epochs": 10},
-    {"id": "S3", "action": "only after baseline adaptation, consider train-only quality selection or geometry module one factor at a time"},
-    {"id": "S4", "action": "fixed See, matched GT versus predicted crops and full-scene spotting; eventual locked test500"}
+    {
+      "id": "S0",
+      "action": "verify 20-image review and source-group isolation; audit token lengths before inference"
+    },
+    {
+      "id": "S1",
+      "action": "same frozen R4, compare axis_aligned versus boundary_when_supported; score all eligible references including failed crops"
+    },
+    {
+      "id": "S2",
+      "action": "pair common training IDs, new optimizer for each arm, freeze enhancer and non-LoRA parameters",
+      "batch_size": 4,
+      "lr": 2e-05,
+      "seed": 0,
+      "max_len_initial": 128,
+      "short_resource_check_seconds": 1200,
+      "formal_epochs": 5,
+      "extend_to_epochs": 10
+    },
+    {
+      "id": "S3",
+      "action": "only after baseline adaptation, consider train-only quality selection or geometry module one factor at a time"
+    },
+    {
+      "id": "S4",
+      "action": "fixed See, matched GT versus predicted crops and full-scene spotting; eventual locked test500"
+    }
   ],
-  "selection": {"primary": "all-eligible dev raw CER; failed crops predict empty string", "secondary": ["exact line accuracy", "recognizable-Latin coverage", "crop failure rate", "per-source-image paired bootstrap CI", "geometry/readability strata"],
-                "minimum_cer_improvement_pp": 1.0, "no_claim_from_training_loss_only": true},
+  "selection": {
+    "primary": "all-eligible dev raw CER; failed crops predict empty string",
+    "secondary": [
+      "exact line accuracy",
+      "recognizable-Latin coverage",
+      "crop failure rate",
+      "per-source-image paired bootstrap CI",
+      "geometry/readability strata"
+    ],
+    "minimum_cer_improvement_pp": 1.0,
+    "no_claim_from_training_loss_only": true
+  },
   "output_namespace": "results/v5/reading/scene_str_20261104",
   "rollback": "separate worktree and new output directories; original R4/See source and weights unchanged",
-  "scope": "GT-crop STR adaptation, not a new detector or demonstrated novel rectifier; no training authorized in this code-preparation turn"
+  "scope": "GT-crop STR adaptation, not a new detector or demonstrated novel rectifier; no training authorized in this code-preparation turn",
+  "ocr_drafts": {
+    "model": "PP-OCRv5_server_rec",
+    "revision": "b26c3587fda8da3c8ec0ce357214b4d661ff1558",
+    "views": [
+      "original",
+      "dataset_bright",
+      "rectified_bright"
+    ],
+    "threshold": null,
+    "all_scores_retained": true,
+    "human_confirmation_required": true
+  }
 }

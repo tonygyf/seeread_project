@@ -46,21 +46,27 @@ def render_pages(output):
     assists = {r['id']: r for r in read_jsonl(output / 'review_assists.jsonl')} if (output / 'review_assists.jsonl').exists() else {}
     human = {r['id']: r for r in read_jsonl(output / 'human_views.jsonl')} if (output / 'human_views.jsonl').exists() else {}
     quality = {r['id']: r for r in read_jsonl(output / 'quality_hints.jsonl')} if (output / 'quality_hints.jsonl').exists() else {}
+    paddle = {r['id']: r for r in read_jsonl(output / 'paddle_drafts.jsonl')} if (output / 'paddle_drafts.jsonl').exists() else {}
+    paddle_human = {r['id']: r for r in read_jsonl(output / 'paddle_human_views.jsonl')} if (output / 'paddle_human_views.jsonl').exists() else {}
+    protocol = json.loads((output / 'protocol.json').read_text())
+    state = json.loads((output / 'paddle_drafts_provenance.json').read_text()) if (output / 'paddle_drafts_provenance.json').exists() else {}
     enriched = []
     for it in items:
         assist = assists.get(it['id'], {})
         before = drafts.get(it['id'], {})
         enhanced = assist.get('enhanced_text', before.get('text'))
         raw = assist.get('raw_text')
-        enriched.append({**it, 'draft': enhanced or raw or '', 'draft_raw': raw, 'draft_enhanced': enhanced,
+        enriched.append({**it, 'draft': paddle.get(it['id'], {}).get('text', enhanced or raw or ''), 'draft_raw': raw, 'draft_enhanced': enhanced,
                          'lle_crop': assist.get('lle_crop'), 'raw_crop_error': assist.get('raw_crop_error'),
                          'enhanced_crop_error': assist.get('enhanced_crop_error', before.get('crop_error')),
-                         'human': human.get(it['id']), 'quality_hint': quality.get(it['id'])})
+                         'paddle': paddle.get(it['id']), 'human': human.get(it['id'], paddle_human.get(it['id'])), 'quality_hint': quality.get(it['id'])})
     items = enriched
     template = (Path(__file__).resolve().parents[2] / 'tools/data/lated_review_template.html').read_text()
     for name, selected in [('review', items), ('pilot', [i for i in items if i['pilot']])]:
         payload = json.dumps(selected, ensure_ascii=False).replace('<', '\\u003c')
         page = template.replace('__ITEMS__', payload).replace('__PROTOCOL__', json.dumps(sha256(output / 'protocol.json')))
+        page = page.replace('__LEGACY_PROTOCOLS__', json.dumps(protocol.get('legacy_review_protocols', [])))
+        page = page.replace('__OCR_STATE__', json.dumps({k:state.get(k) for k in ('status','completed','expected')}))
         temporary = output / f'{name}.html.tmp'
         temporary.write_text(page)
         temporary.replace(output / f'{name}.html')
