@@ -276,6 +276,105 @@ def write_json(path, value):
         stream.write("\n")
 
 
+def lated_split_membership(splits, official):
+    """Check development membership against the release lists, not filenames alone."""
+    ids = {key: [Path(row['image']).stem for row in rows] for key, rows in splits.items()}
+    duplicates = {key: sorted(name for name, n in Counter(names).items() if n > 1)
+                  for key, names in {**ids, **{'official_' + k: v for k, v in official.items()}}.items()}
+    sets = {key: set(names) for key, names in ids.items()}
+    overlap = {a + '__' + b: sorted(sets[a] & sets[b])
+               for a, b in (('train', 'val'), ('train', 'test'), ('val', 'test'))}
+    errors = [f'duplicate_ids:{key}' for key, names in duplicates.items() if names]
+    errors += [f'split_overlap:{key}' for key, names in overlap.items() if names]
+    if set(official['train']) & set(official['test']):
+        errors.append('official_train_test_overlap')
+    if sets['train'] | sets['val'] != set(official['train']):
+        errors.append('development_union_differs_from_official_train')
+    if sets['test'] != set(official['test']):
+        errors.append('test_differs_from_official_test')
+    return dict(errors=errors, counts={key: len(names) for key, names in ids.items()},
+                official_counts={key: len(names) for key, names in official.items()},
+                duplicate_ids=duplicates, overlap=overlap,
+                training_images_withheld_for_dev=len(set(official['train']) - sets['train']))
+
+
+def _canonical_ring(points):
+    points = [tuple(point) for point in points]
+    if len(points) > 1 and points[0] == points[-1]:
+        points.pop()
+    reverse = points[::-1]
+    return min(tuple(ring[i:] + ring[:i]) for ring in (points, reverse) for i in range(len(ring)))
+
+
+def audit_lated_protocol(root, manifests):
+    """Read-only release, polygon and fresh image-byte audit; no model/test scoring."""
+    raw = root / 'raw/LATeD'
+    official = {key: (raw / f'{key}_list.txt').read_text().split() for key in ('train', 'test')}
+    paths = {key: manifests / f'latedspot_{key}.jsonl' for key in ('train', 'val', 'test')}
+    splits = {key: [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+              for key, path in paths.items()}
+    membership = lated_split_membership(splits, official)
+    errors = membership['errors'].copy()
+    if membership['official_counts'] != dict(train=1000, test=500):
+        errors.append('official_release_count_differs_from_paper_1000_500')
+    protocol = json.loads((manifests / 'provenance.json').read_text())
+    registry = manifests / 'image_fingerprints.jsonl'
+    registry_hash = sha256(registry)
+    if registry_hash != protocol['image_fingerprints']['sha256']:
+        raise ValueError('Frozen image fingerprint registry changed; original provenance is required')
+    with registry.open() as stream:
+        registered = {r['path']: r for r in map(json.loads, stream)}
+    cache, reports, coverage, annotation_mismatches = {}, {}, {}, []
+    source_instances = Counter()
+    for split, rows in splits.items():
+        manifest_hash = sha256(paths[split])
+        if manifest_hash != protocol['frozen_manifests']['latedspot_' + split]['sha256']:
+            errors.append(f'frozen_manifest_changed:{split}')
+        reports[split], _, coverage[split] = inspect_manifest(paths[split], root, cache, len(rows), keep_rows=False)
+        for row in rows:
+            stem = Path(row['image']).stem
+            if row['image'] != f'raw/LATeD/image/{stem}.jpg':
+                errors.append(f'unexpected_image_source:{row["image"]}')
+            source = (raw / 'label' / f'{stem}.txt').read_text().splitlines()
+            expected = {}
+            for index, line in enumerate(source):
+                if not line.strip():
+                    continue
+                flat = [float(v) for v in line.replace(',', ' ').split()]
+                if len(flat) < 6 or len(flat) % 2 or not all(map(math.isfinite, flat)):
+                    raise ValueError(f'Invalid released polygon: {stem}#{index}')
+                points = [[round(x), round(y)] for x, y in zip(flat[::2], flat[1::2])]
+                expected[f'{stem}#{index}'] = _canonical_ring(points)
+            actual = {i['id']: _canonical_ring(i['poly']) for i in row['instances']}
+            if len(actual) != len(row['instances']) or actual != expected or any(i['ignore'] for i in row['instances']):
+                annotation_mismatches.append(row['image'])
+            source_instances['test' if split == 'test' else 'train'] += len(expected)
+        print(json.dumps(dict(audit='lated_release', split=split, images=len(rows))), flush=True)
+    for path, fingerprint in cache.items():
+        if path not in registered or fingerprint['sha256'] != registered[path]['sha256']:
+            errors.append(f'image_bytes_changed:{path}')
+    overlaps = {a + '__' + b: pair_overlap(coverage[a], coverage[b])
+                for a, b in (('train', 'val'), ('train', 'test'), ('val', 'test'))}
+    errors += [f'image_byte_overlap:{key}' for key, value in overlaps.items() if value['shared_content_hashes']]
+    if annotation_mismatches:
+        errors.append('source_polygon_or_ignore_mismatch')
+    if sum(source_instances.values()) != 13923:
+        errors.append('released_instance_count_differs_from_paper_13923')
+    return dict(status='pass' if not errors else 'fail', errors=errors,
+                scope='Release membership, all source polygons and fresh file-byte hashes; no model inference or test scoring',
+                membership=membership, manifests=reports, overlap_checks=overlaps,
+                source_instances=dict(source_instances), annotation_mismatches=annotation_mismatches,
+                source_list_sha256={key: sha256(raw / f'{key}_list.txt') for key in official},
+                fresh_images_checked=len(cache), fingerprint_registry_sha256=registry_hash,
+                audit_script_sha256=sha256(__file__),
+                paper_alignment=dict(official_train=1000, official_test=500,
+                                     current_training=len(splits['train']), current_development=len(splits['val']),
+                                     exact_training_protocol=len(splits['train']) == 1000,
+                                     development_scores_comparable_to_paper_test=False,
+                                     note='900/100 is a development holdout, not a swapped official split; '
+                                          'a future full1000 run must not select checkpoints on these100 images'))
+
+
 def mlt17_instances(text):
     """RRC MLT17: eight coordinates, script, then the unescaped transcription."""
     instances = []
@@ -442,7 +541,19 @@ def main():
                         help="Validate/extract all eleven MLT17 ZIPs and add independent train/dev manifests")
     parser.add_argument("--quarantine-known-overlap", action="store_true",
                         help="Repair only existing v5 TotalText train/dev byte overlap; preserve original files and locked test")
+    parser.add_argument("--audit-lated", type=Path,
+                        help="Write a read-only LATeD official-list/source-polygon/fresh-image-hash audit to this new report")
     args = parser.parse_args()
+    if args.audit_lated:
+        if args.audit_lated.exists():
+            raise FileExistsError(f'Preserving existing audit: {args.audit_lated}')
+        report = audit_lated_protocol(args.data_root, args.out)
+        args.audit_lated.parent.mkdir(parents=True, exist_ok=True)
+        write_json(args.audit_lated, report)
+        print(json.dumps(dict(status=report['status'], errors=report['errors'], membership=report['membership'])), flush=True)
+        if report['errors']:
+            raise SystemExit(1)
+        return
     if args.prepare_mlt17:
         prepare_mlt17(args.data_root, args.out)
         return

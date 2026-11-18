@@ -387,8 +387,8 @@ def execute(cfg, *, resume=None, reduced=False, public_only=False):
     stage, train, data = cfg["stage"], cfg["train"], cfg["data"]
     if stage["name"] not in STAGES or int(stage["epochs"]) < 1:
         raise ValueError("Unknown or empty detection stage")
-    if not 0 < float(train["memory_fraction"]) <= .35 or float(train["max_seconds"]) < 0 or int(train["max_steps"]) < 0:
-        raise ValueError("Invalid resource budget; memory_fraction cannot exceed0.35")
+    if not 0 < float(train["memory_fraction"]) <= .8 or float(train["max_seconds"]) < 0 or int(train["max_steps"]) < 0:
+        raise ValueError("Invalid resource budget; memory_fraction cannot exceed0.8")
     for field in ("batch_size", "val_batch_size", "lr_step_epochs", "val_every_epochs", "save_every_updates", "log_every"):
         if int(train[field]) < 1:
             raise ValueError(f"Positive {field} is required")

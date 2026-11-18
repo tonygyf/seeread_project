@@ -1,0 +1,68 @@
+{
+  "schema": "spotting_mvp_release_v1",
+  "created_utc": "2026-10-27T03:32:39.715372+00:00",
+  "annotation_source": "human_dataset_release",
+  "data_protocol": {
+    "path": "data/annotations/v5/fusion_test_20261027/totaltext_test_protocol.json",
+    "sha256": "dcfc00a65104a94d2fa6b6a3202ff81907b277a4f4a1306569ed0acc2a9407cc"
+  },
+  "runtime": "results/v5/runtime/lated_balanced_ce_20261026",
+  "detector": "results/v5/detection/LATeD_balanced_ce_20261026/best.pt",
+  "reading": "results/v5/fusion/read_connector_lora_20261025/best.pt",
+  "detector_sha256": "2378a207ce72f84dbcabd5492f675330e30054101c55925c819e855775f71d62",
+  "reading_sha256": "892e9e625561d946c0a445cf417948f6dcd12be74d1a5a215cfa9fc1b5151015",
+  "max_len": 128,
+  "crop": {
+    "output_hw": [
+      384,
+      384
+    ],
+    "center_points": 32,
+    "pad": 1.1,
+    "sampling": "boundary_with_hull_fallback"
+  },
+  "decoder": {
+    "text_threshold": 0.5,
+    "center_threshold": 0.5,
+    "rectangle_width": 6.0,
+    "sample_step": 3.0,
+    "max_samples": 64,
+    "close_kernel": 3,
+    "min_component_area": 3,
+    "min_polygon_area": 3,
+    "max_detections": 100
+  },
+  "detector_hw": [
+    640,
+    640
+  ],
+  "source_sha256": {
+    "tools/v5_lated.py": "608b33b234c4a6e5bdc214625191af7234397d040148925fdfc1462e7d7fde1b",
+    "seeread/v5/lated_evaluation.py": "8291ff063051a83404009791a2a851c2786946502856466960030426123ec6ff",
+    "seeread/v5/lated_annotations.py": "37047b41f8d968012df18153b532c5937af47acd1bf2812a7bcaeb6905af6510",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/seeing.py": "757685d1e1318683b4eb6677a0512a3b929854a4e16c5c05de3513e20b14908e",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/dsconv.py": "b497f799e6edf02fa41d8a28255f6027a3db4ae258741ba4c45e1e926238116a",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/seeing_decode.py": "2532f9ab280d4fb65717bc872883a96797c3c1e9d478f61f49ef05604822e582",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/spotting.py": "84a0f28ba0bea0fce685e9c71fd426e45e37ab5538cac8e7f4d63959a6703eb5",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/recognition.py": "9411ec0dfb8c5925b3308f78dfeba4ffacfb49b9d63f98444b132ff2550598fb",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/enhancers.py": "5d979b097ae75dad293cb1e4e304d2be5f4c679a4baa4441de06f10d31ec2fea",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/v5/reading.py": "9cc18e7cdf26d0b6551767b6067486f7f40f4385f1577b967f955f5c71e5981d",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/models/rectify.py": "face375ea75da25e96363a97fd9381c923c8f5325e092eacd75f592573bc068a",
+    "results/v5/runtime/lated_balanced_ce_20261026/seeread/models/recognizer.py": "3c61fb219aa939a51fbf345e16f820d81a8e4ec32c1daac19c4193fc2998e19d",
+    "results/v5/runtime/lated_balanced_ce_20261026/tools/v5_eval_spotting.py": "e8cf7dfdfdcb951cbe216e966e35e1a7b241a17d466c29f985ff9f11cd89ada0"
+  },
+  "selection": {
+    "detector": "highest preexisting LATeD100 dev internal F1 among completed runs; 53.6774% at epoch90; no test selection",
+    "reading": "preexisting connector domain LoRA best at24800; independentRead retained",
+    "crop": "preexisting hull policy pad1.1 selected on fixed TotalText dev",
+    "decode": "max_len128 fixed before any test inference; no test tuning"
+  },
+  "pipeline": "original RGB -> See polygons -> native polygon strip -> frozen Self-DACE -> adapted Read LoRA; per-instance text and crop failures",
+  "evaluation": "Internal CTW-VOC polygon IoU>0.5, lower-alnum Latin E2E, raw CER including failed crops; not official TotalText benchmark",
+  "boundaries": [
+    "TotalText official300 image test split, paired original/synthetic-dark with released human transcriptions",
+    "LATeD500 and ESTR60 remain sealed",
+    "Exact image-byte train/dev/test isolation audited for local TotalText scene manifests; no assertion of complete public-pretraining scene deduplication",
+    "LATeD OCR drafts remain pending and are never used as recognition truth"
+  ]
+}

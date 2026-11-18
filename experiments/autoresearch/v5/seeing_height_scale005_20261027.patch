@@ -1,0 +1,11 @@
+--- a/seeread/v5/seeing_losses.py
++++ b/seeread/v5/seeing_losses.py
+@@ -52,7 +52,7 @@
+         ce = F.cross_entropy(pred[key], gt[key].long(), reduction='none')
+         losses[key] = _balanced_ce(ce, gt[key], valid)
+     height = pred['height'][:, 0]
+-    losses['height'] = _masked_mean(F.smooth_l1_loss(height, gt['height'].to(height.dtype), reduction='none'), center)
++    losses['height'] = .05 * _masked_mean(F.smooth_l1_loss(height, gt['height'].to(height.dtype), reduction='none'), center)
+     delta = pred['angle'][:, 0] - gt['angle']
+     wrapped = .5 * torch.atan2(torch.sin(2 * delta), torch.cos(2 * delta))
+     losses['angle'] = _masked_mean(F.smooth_l1_loss(wrapped, torch.zeros_like(wrapped), reduction='none'), center)

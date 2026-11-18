@@ -9,8 +9,29 @@ from shapely.geometry import Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from seeread.v5.seeing_data import targets_from_polygons
-from seeread.v5.seeing_losses import detection_loss
+from seeread.v5.seeing_losses import detection_loss as _detection_loss
 from seeread.v5.seeing_decode import decode, farthest_point_sampling
+
+
+def detection_loss(pred, target):
+    return _detection_loss(pred, target, scm_target=target['text'])
+
+
+def test_scm_reconstruction_uses_input_mask_instead_of_feature_text():
+    target = targets_from_polygons([], (64, 64), (16, 16))
+    pred = _loss_prediction()
+    mask = torch.zeros(64, 64)
+    mask[:8, :8] = 1
+    pred['scm_mask'] = torch.zeros(1, 2, 8, 8)
+    pred['scm_mask'][:, 0] = 1
+    result = _detection_loss(pred, target, scm_target=mask)
+    assert torch.allclose(result['scm_mask'], torch.tensor(1 / 64))
+    try:
+        _detection_loss(pred, target)
+    except ValueError as error:
+        assert 'input-resolution text mask' in str(error)
+    else:
+        raise AssertionError('Missing SCM input mask must be rejected')
 
 
 def _prediction(target):
@@ -72,6 +93,29 @@ def test_adjacent_instances_stay_separate_and_fps_is_deterministic():
     assert all(max(_iou(p, d['poly']) for d in a) > .65 for p in polygons)
     pts = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], np.float32)
     assert len(set(farthest_point_sampling(pts, 4).tolist())) == 4
+
+
+def test_center_only_candidate_does_not_discard_low_text_probability_centers():
+    center = np.zeros((24, 40), np.int64)
+    center[12, 5:35] = 1
+    target = dict(text=np.zeros_like(center), center=center,
+                  height=np.full(center.shape, 6., np.float32),
+                  angle=np.zeros(center.shape, np.float32))
+    pred = _prediction(target)
+    assert decode(pred, image_hw=center.shape) == []
+    result = decode(pred, image_hw=center.shape, center_mask_mode='center_only')
+    assert len(result) == 1 and Polygon(result[0]['poly']).is_valid
+
+
+def test_decoded_polygon_is_valid_when_reconstruction_touches_itself():
+    # A connected centerline can make the accumulated boundary touch itself.
+    center = np.zeros((40, 40), np.uint8)
+    cv2.polylines(center, [np.array([[11, 13], [31, 33], [4, 19]], np.int32)], False, 1, 1)
+    target = dict(text=center, center=center, height=np.full(center.shape, 7., np.float32),
+                  angle=np.full(center.shape, .8912083, np.float32))
+    predictions = decode(_prediction(target), image_hw=center.shape)
+    assert predictions
+    assert all(Polygon(prediction['poly']).is_valid for prediction in predictions)
 
 
 def test_optional_all_contours_retains_disconnected_reconstruction_fragments():
@@ -181,3 +225,18 @@ if __name__ == '__main__':
         if name.startswith('test_'):
             test()
             print('PASS', name)
+
+
+def test_semantic_square_and_mask_reduction_do_not_overflow_fp16():
+    # FP16 square(300) and a 320x320 valid-pixel count both exceed 65504.
+    target = {k: torch.ones(1, 320, 320) for k in ('text', 'center', 'valid', 'height', 'angle')}
+    main = torch.full((1, 4, 20, 20), 300., dtype=torch.float16, requires_grad=True)
+    pred = dict(text=torch.zeros(1, 2, 320, 320), center=torch.zeros(1, 2, 320, 320),
+                height=torch.full((1, 1, 320, 320), 2., dtype=torch.float16),
+                angle=torch.ones(1, 1, 320, 320), sem_main=main, scm_sem=torch.zeros_like(main))
+    losses = _detection_loss(pred, target)
+    assert torch.isfinite(sum(losses.values()))
+    torch.testing.assert_close(losses['scm_sem'], torch.tensor(90000.))
+    torch.testing.assert_close(losses['height'], torch.tensor(.5))
+    losses['scm_sem'].backward()
+    assert torch.isfinite(main.grad).all()

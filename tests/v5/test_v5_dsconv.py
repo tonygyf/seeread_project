@@ -41,6 +41,21 @@ class OfficialDSConvParity(unittest.TestCase):
         direct.load_state_dict(adapted.operator.state_dict(), strict=True)
         return adapted, direct
 
+    def test_large_offset_predictor_stays_finite_under_amp(self):
+        for morph in (0, 1):
+            adapted, _ = self._pair(morph)
+            with torch.no_grad():
+                adapted.operator.offset_conv.weight.fill_(10000.)
+            image = torch.rand(2, 3, 8, 11, requires_grad=True)
+            reference = adapted(image).detach()
+            with torch.autocast('cpu', dtype=torch.float16):
+                prediction = adapted(image)
+            self.assertTrue(torch.isfinite(prediction).all())
+            torch.testing.assert_close(prediction.float(), reference, rtol=.05, atol=.05)
+            prediction.float().square().mean().backward()
+            self.assertTrue(torch.isfinite(image.grad).all())
+            self.assertTrue(torch.isfinite(adapted.operator.offset_conv.weight.grad).all())
+
     def test_large_deformed_convolution_stays_finite_under_amp(self):
         for morph in (0, 1):
             adapted, _ = self._pair(morph)

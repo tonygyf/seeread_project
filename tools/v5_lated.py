@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DETECTOR = 'results/v5/detection/LATeD_geometry_fast_20261025/best.pt'
+DEFAULT_DETECTOR = 'results/v5/detection/LATeD_balanced_ce_20261026/best.pt'
 DEFAULT_READING = 'results/v5/fusion/read_connector_lora_20261025/best.pt'
 CROP = dict(output_hw=(384, 384), center_points=32, pad=1.1, sampling='boundary_with_hull_fallback')
 
@@ -44,6 +44,8 @@ def models(args):
 
 def rows_for(args):
     from seeread.v5.lated_annotations import labelled_rows, read_jsonl
+    if getattr(args, 'release', None):
+        return release_rows(args)
     if args.sidecar:
         return labelled_rows(args.package, args.sidecar, 'dev', pilot=args.pilot)
     if args.image:
@@ -51,6 +53,49 @@ def rows_for(args):
     if 'test' in args.manifest.stem.lower():
         raise ValueError('MVP uses development only; final test requires a separately locked release')
     return read_jsonl(args.manifest)
+
+
+def release_rows(args):
+    """A held-out spotting run binds human GT and inference settings before scoring."""
+    from seeread.v5.lated_annotations import latin_text, read_jsonl
+    from seeread.v5.reading import sha256
+    if args.sidecar or args.image or args.limit or args.pilot:
+        raise ValueError('A locked release must evaluate its full manifest without sidecar or image overrides')
+    release = json.loads(args.release.read_text())
+    if release.get('schema') != 'spotting_mvp_release_v1' or release.get('annotation_source') != 'human_dataset_release':
+        raise ValueError('A locked human-annotated spotting release is required; OCR drafts are not ground truth')
+    if args.runtime.resolve() != Path(release['runtime']).resolve():
+        raise ValueError('Locked release runtime changed')
+    for path, expected in release['source_sha256'].items():
+        if sha256(path) != expected:
+            raise ValueError(f'Locked release source changed: {path}')
+    for key, path in [('detector_sha256', args.detector), ('reading_sha256', args.reading)]:
+        if sha256(path) != release[key]:
+            raise ValueError(f'Locked release changed {key}')
+    if args.max_len != release['max_len'] or json.loads(json.dumps(CROP)) != release['crop']:
+        raise ValueError('Locked release changed crop or decoding length')
+    binding = release['data_protocol']
+    protocol_path = Path(binding['path'])
+    if sha256(protocol_path) != binding['sha256']:
+        raise ValueError('Locked release data protocol changed')
+    protocol = json.loads(protocol_path.read_text())
+    if protocol.get('annotation_source') != 'human_dataset_release' or protocol.get('split') != 'test':
+        raise ValueError('The release requires a human-annotated held-out test protocol')
+    cases = [key for key, value in protocol['outputs'].items() if Path(value['path']).resolve() == args.manifest.resolve()]
+    if len(cases) != 1 or sha256(args.manifest) != protocol['outputs'][cases[0]]['sha256']:
+        raise ValueError('Manifest differs from locked release')
+    rows = read_jsonl(args.manifest)
+    if len(rows) != protocol['samples'] or len(rows) != len(protocol['pairs']):
+        raise ValueError('Locked release requires every held-out image')
+    for row, pair in zip(rows, protocol['pairs']):
+        if row['image'] != pair[cases[0]] or row['source_id'] != pair['bright']:
+            raise ValueError('Locked release image order differs')
+        if sha256(args.root / row['image']) != pair[cases[0] + '_sha256']:
+            raise ValueError('Locked release image bytes changed')
+        for index, gt in enumerate(row['instances']):
+            gt.setdefault('id', f'{row["source_id"]}#{index}')
+            gt['ocr_eligible'] = not gt.get('ignore') and latin_text(gt.get('text', '')) and gt.get('text') != '###'
+    return rows
 
 
 def infer(args):
@@ -65,13 +110,20 @@ def infer(args):
     if args.limit:
         rows = rows[:args.limit]
     spotter, decoder, provenance = models(args)
+    release = json.loads(args.release.read_text()) if args.release else None
+    if release and decoder != release['decoder']:
+        raise ValueError('Locked release detector decoder changed')
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / 'visualizations').mkdir()
-    report = dict(status='running', scope='LATeD MVP development; not official test',
+    report = dict(status='running', scope=('locked TotalText spotting test; internal CTW-VOC matching, not official TotalText benchmark'
+                                          if release else 'LATeD MVP development; not official test'),
                   detector_sha256=sha256(args.detector), reading_sha256=sha256(args.reading),
                   max_len=args.max_len, detector_hw=[640, 640], crop=CROP, decoder=decoder,
                   package_sha256=sha256(args.package / 'protocol.json') if args.sidecar else None,
                   sidecar_sha256=sha256(args.sidecar) if args.sidecar else None, pilot=args.pilot,
+                  release_sha256=sha256(args.release) if release else None,
+                  manifest_sha256=sha256(args.manifest) if not args.image else None,
+                  visual_reference=args.visual_reference,
                   source_sha256={str(p): sha256(p) for p in (Path(__file__), Path(spotting_source.__file__), Path(rectify_source.__file__))},
                   image_sha256={r['image']: sha256(args.root / r['image']) for r in rows}, provenance=provenance)
     (args.output / 'run.json').write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n')
@@ -86,7 +138,10 @@ def infer(args):
             record = dict(image=row['image'], predictions=[dict(p, poly=np.asarray(p['poly']).tolist()) for p in predictions],
                           gt_crops=[dict(p, id=g['id'], poly=np.asarray(p['poly']).tolist()) for p, g in zip(crops, eligible)])
             stream.write(json.dumps(record, ensure_ascii=False, allow_nan=False)+'\n'); stream.flush(); records.append(record)
-            canvas = cv2.imread(str(path), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+            reference_path = args.root / row.get('lit', row['image']) if args.visual_reference == 'paired' else path
+            canvas = cv2.imread(str(reference_path), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+            if canvas is None or canvas.shape[:2] != tuple(image.shape[-2:]):
+                raise ValueError('Visualization reference must share original image coordinates')
             for p in predictions:
                 poly = np.rint(p['poly']).astype(np.int32)
                 cv2.polylines(canvas, [poly], True, (0, 255, 255), 2)
@@ -95,7 +150,7 @@ def infer(args):
             name = hashlib.sha256(row['image'].encode()).hexdigest()[:20]
             cv2.imwrite(str(args.output / 'visualizations' / f'{name}.jpg'), canvas)
             print(json.dumps(dict(images=len(records), expected=len(rows))), flush=True)
-    if args.sidecar and not args.limit:
+    if (args.sidecar or release) and not args.limit:
         from seeread.v5.lated_evaluation import evaluate_records
         report['evaluation'] = evaluate_records(rows, records)
     cards = []
@@ -105,9 +160,16 @@ def infer(args):
                              for p in record['predictions'])
         cards.append(f'<article><h3>{html.escape(record["image"])}</h3><img src="visualizations/{name}.jpg">'
                      f'<p>{labels or "No detections"}</p></article>')
-    (args.output / 'preview.html').write_text('<!doctype html><meta charset="utf-8"><title>LATeD MVP</title>'
+    evaluation = report.get('evaluation')
+    score = ('<pre>' + html.escape(json.dumps({k:evaluation[k] for k in ('detection','latin_e2e','gt_crop_raw',
+              'matched_gt_crop_raw','matched_prediction_crop_raw')},ensure_ascii=False,indent=2)) + '</pre>') if evaluation else ''
+    reference_note = ('显示配对亮图便于核对；See与Read输入仍为所选原图，亮图未进入推理。'
+                      if args.visual_reference == 'paired' else '显示原图及整图推理输出。')
+    (args.output / 'preview.html').write_text('<!doctype html><meta charset="utf-8"><title>See＋Read MVP</title>'
         '<style>body{font:16px system-ui;max-width:1100px;margin:auto}img{max-width:100%}article{padding:20px;border-bottom:1px solid #aaa}</style>'
-        '<h1>LATeD MVP：整图多实例识别</h1><p>固定基线输出；未审核转写前不报告真实识别成绩。</p>' + ''.join(cards))
+        '<h1>See＋Read：整图多实例识别</h1><p>' + reference_note + '</p><p>' +
+        ('人工转写GT的锁定测试；此处为内部匹配规则，非官方TotalText榜单成绩。' if release else
+         '固定基线输出；未审核转写前不报告真实识别成绩。') + '</p>' + score + ''.join(cards))
     report.update(status='complete', images=len(records))
     (args.output / 'run.json').write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n')
     return report
@@ -248,7 +310,7 @@ def compare(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--runtime',type=Path,default=Path('results/v5/runtime/lated_geometry_fast_20261025'))
+    p.add_argument('--runtime',type=Path,default=Path('results/v5/runtime/lated_balanced_ce_20261026'))
     sub=p.add_subparsers(dest='command',required=True)
     for name in ('infer','drafts'):
         s=sub.add_parser(name);s.add_argument('--detector',type=Path,default=Path(DEFAULT_DETECTOR));s.add_argument('--reading',type=Path,default=Path(DEFAULT_READING))
@@ -256,6 +318,8 @@ def main():
         if name=='infer':
             s.add_argument('--root',type=Path,default=Path('data'));s.add_argument('--manifest',type=Path,default=Path('data/annotations/v5/detection/latedspot_val.jsonl'))
             s.add_argument('--pilot',action='store_true');s.add_argument('--image',type=Path);s.add_argument('--sidecar',type=Path);s.add_argument('--output',type=Path,required=True);s.add_argument('--limit',type=int,default=0)
+            s.add_argument('--release',type=Path,help='Prelocked human-GT spotting test release; permits its registered test manifest only')
+            s.add_argument('--visual-reference',choices=('original','paired'),default='original')
     s=sub.add_parser('prepare-crops');s.add_argument('--package',type=Path,required=True);s.add_argument('--sidecar',type=Path,required=True);s.add_argument('--root',type=Path,default=Path('data'));s.add_argument('--output',type=Path,required=True);s.add_argument('--predictions',type=Path)
     s=sub.add_parser('protocol');s.add_argument('--manifest',type=Path,required=True);s.add_argument('--records',type=Path,required=True);s.add_argument('--output',type=Path,required=True)
     s=sub.add_parser('compare');s.add_argument('--reference',type=Path,required=True);s.add_argument('--candidate',type=Path,required=True);s.add_argument('--output',type=Path,required=True)

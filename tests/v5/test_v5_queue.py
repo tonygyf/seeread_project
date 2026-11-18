@@ -100,6 +100,16 @@ class QueueSafetyTests(unittest.TestCase):
             self.assertEqual(gpu_processes(3), {123, 456})
             self.assertEqual(command.call_args.args[0][2], '3')
 
+    def test_gpu0_exempts_only_small_known_desktop_process(self):
+        desktop = '/snap/snapd-desktop-integration/391/usr/bin/snapd-desktop-integration'
+        with patch('tools.v5_research_queue.command', return_value=f'11154, {desktop}, 13\n123, python, 50'):
+            self.assertEqual(gpu_processes(0), {123})
+        with patch('tools.v5_research_queue.command', return_value=f'11154, {desktop}, 33'):
+            self.assertEqual(gpu_processes(0), {11154})
+        with patch('tools.v5_research_queue.command', return_value='malformed'):
+            with self.assertRaises(ValueError):
+                gpu_processes(0)
+
     def test_interrupt_uses_unique_record_and_token_not_command_line_matching(self):
         with patch('tools.v5_research_queue.command', return_value='{"signaled":true,"container_pid":17}') as command:
             self.assertEqual(stop_own_job('ours', '/workspace/owner.json', 'unique')['container_pid'], 17)

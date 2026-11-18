@@ -31,8 +31,8 @@ def tensor_summary(value):
                 minimum=scalar(value.min()), maximum=scalar(value.max()))
 
 
-def loss_summary(prediction, targets):
-    losses = detection_loss(prediction, targets)
+def loss_summary(prediction, targets, scm_target):
+    losses = detection_loss(prediction, targets, scm_target=scm_target)
     return dict(total=scalar(sum(losses.values())),
                 components={key: scalar(value) for key, value in losses.items()},
                 dtypes={key: str(value.dtype) for key, value in losses.items()})
@@ -114,7 +114,7 @@ def diagnose(checkpoint_path, output, *, trace_features=False, include_bf16=Fals
                                 key, dict(input=tensor_summary(inputs[0]), output=tensor_summary(value)))))
             with torch.autocast('cuda', enabled=amp, dtype=dtype):
                 prediction = model(batch['image'], with_scm=True, mask=batch['mask'])
-                original = loss_summary(prediction, batch['targets'])
+                original = loss_summary(prediction, batch['targets'], batch['mask'])
             for handle in handles:
                 handle.remove()
             result = dict(outputs={key: tensor_summary(value) for key, value in prediction.items()
@@ -125,7 +125,7 @@ def diagnose(checkpoint_path, output, *, trace_features=False, include_bf16=Fals
                 with torch.autocast('cuda', enabled=False):
                     converted = {key: value.float() if isinstance(value, torch.Tensor) and key != 'feat' else value
                                  for key, value in prediction.items()}
-                    result['same_outputs_fp32_loss'] = loss_summary(converted, batch['targets'])
+                    result['same_outputs_fp32_loss'] = loss_summary(converted, batch['targets'], batch['mask'])
                     raw = (prediction['sem_main'].float() - prediction['scm_sem'].float()).square().mean(1)
                     result['semantic_error_fp32'] = dict(tensor_summary(raw),
                                                         mean=scalar(raw.mean()), sum=scalar(raw.sum()))

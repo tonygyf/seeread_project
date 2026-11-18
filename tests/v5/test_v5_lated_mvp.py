@@ -13,21 +13,102 @@ def box(x0, x1):
     return [[x0, 0], [x1, 0], [x1, 10], [x0, 10]]
 
 
+def test_locked_spotting_release_binds_human_truth_weights_images_and_decode(tmp_path):
+    from argparse import Namespace
+    from tools.v5_lated import CROP, release_rows
+    image=tmp_path/'dark.png'; image.write_bytes(b'original image bytes')
+    detector=tmp_path/'see.pt'; detector.write_bytes(b'see')
+    reading=tmp_path/'read.pt'; reading.write_bytes(b'read')
+    manifest=tmp_path/'sample_test.jsonl'
+    write_jsonl(manifest,[dict(image=image.name,source_id='original.png',instances=[
+        dict(id='latin',poly=box(0,10),text='ABC',ignore=False),
+        dict(id='other',poly=box(20,30),text='中文',ignore=False)])])
+    protocol=tmp_path/'protocol.json'
+    protocol.write_text(json.dumps(dict(annotation_source='human_dataset_release',split='test',samples=1,
+        outputs={'dark':dict(path=str(manifest),sha256=sha256(manifest))},
+        pairs=[dict(bright='original.png',dark=image.name,dark_sha256=sha256(image))])))
+    release=tmp_path/'release.json'
+    locked=dict(schema='spotting_mvp_release_v1',annotation_source='human_dataset_release',
+        data_protocol=dict(path=str(protocol),sha256=sha256(protocol)),detector_sha256=sha256(detector),
+        reading_sha256=sha256(reading),max_len=128,crop=CROP,decoder={},runtime=str(tmp_path),
+        source_sha256={str(Path(__file__)):sha256(__file__)})
+    release.write_text(json.dumps(locked))
+    args=Namespace(release=release,root=tmp_path,manifest=manifest,detector=detector,reading=reading,
+                   max_len=128,sidecar=None,image=None,limit=0,pilot=False,runtime=tmp_path)
+    assert [g['ocr_eligible'] for g in release_rows(args)[0]['instances']]==[True,False]
+    args.max_len=32
+    with pytest.raises(ValueError,match='decoding length'):release_rows(args)
+    args.max_len=128
+    detector.write_bytes(b'changed')
+    with pytest.raises(ValueError,match='detector_sha256'):release_rows(args)
+    detector.write_bytes(b'see')
+    image.write_bytes(b'changed')
+    with pytest.raises(ValueError,match='image bytes'):release_rows(args)
+    image.write_bytes(b'original image bytes')
+    manifest.write_text(manifest.read_text()+'\n')
+    with pytest.raises(ValueError,match='Manifest'):release_rows(args)
+    locked['annotation_source']='machine_draft_not_ground_truth';release.write_text(json.dumps(locked))
+    with pytest.raises(ValueError,match='OCR drafts'):release_rows(args)
+
+
 def test_review_pages_keep_package_identity_and_both_ocr_candidates(tmp_path):
     (tmp_path/'protocol.json').write_text('{"frozen":true}')
     write_jsonl(tmp_path/'tasks.jsonl', [dict(id='one',pilot=True),dict(id='two',pilot=False)])
     write_jsonl(tmp_path/'drafts.jsonl', [dict(id='one',text='</script>enhanced'),dict(id='two',text='',crop_error='invalid')])
     write_jsonl(tmp_path/'review_assists.jsonl', [dict(id='one',raw_text='raw',enhanced_text='</script>enhanced',lle_crop='crops_lle/one.png')])
+    write_jsonl(tmp_path/'human_views.jsonl', [dict(id='one',views={'bright':'human_views/one.png'},human_aid_only=True)])
     identity = sha256(tmp_path/'protocol.json'), sha256(tmp_path/'tasks.jsonl')
     render_pages(tmp_path)
     page = (tmp_path/'pilot.html').read_text()
     items = json.loads(page.split('const ITEMS=',1)[1].split(',PROTOCOL=',1)[0])
     assert len(items) == 1 and items[0]['draft_raw'] == 'raw'
     assert items[0]['draft_enhanced'] == '</script>enhanced' and items[0]['lle_crop'] == 'crops_lle/one.png'
+    assert items[0]['human']['views']['bright'] == 'human_views/one.png'
     assert '</script>enhanced' not in page
     all_items = json.loads((tmp_path/'review.html').read_text().split('const ITEMS=',1)[1].split(',PROTOCOL=',1)[0])
     assert all_items[1]['draft_raw'] is None and all_items[1]['enhanced_crop_error'] == 'invalid'
+    assert all_items[1]['human'] is None
     assert identity == (sha256(tmp_path/'protocol.json'),sha256(tmp_path/'tasks.jsonl'))
+
+
+def test_human_views_keep_native_geometry_and_source_pixels():
+    import numpy as np
+    from tools.data.enhance_lated_review import human_views
+    dark=np.tile(np.arange(64,dtype=np.uint8).reshape(8,8,1),(1,1,3))//4
+    bright=dark*10
+    original=dark.copy();reference=bright.copy()
+    views=human_views(dark,bright)
+    assert set(views)=={'balanced','bright','exposure','local','detail','retinex'}
+    assert all(v.shape==dark.shape and v.dtype==np.uint8 for v in views.values())
+    assert np.array_equal(views['bright'],reference)
+    assert np.array_equal(dark,original) and np.array_equal(bright,reference)
+    assert views['exposure'].mean()>dark.mean()
+    blank=np.zeros((8,8,3),np.uint8)
+    assert all(v.std()==0 for v in human_views(blank,blank).values())
+
+
+def test_human_recommendation_prefers_strokes_over_noise_and_preserves_sources():
+    import cv2
+    import numpy as np
+    from tools.data.enhance_lated_review import choose_view, viewing_score, viewing_angle
+    clean=np.full((80,240,3),210,np.uint8)
+    cv2.putText(clean,'TEXT',(15,56),cv2.FONT_HERSHEY_SIMPLEX,1.5,(35,35,35),3,cv2.LINE_AA)
+    noisy=np.clip(clean.astype(float)+np.random.default_rng(0).normal(0,35,clean.shape),0,255).astype(np.uint8)
+    mask=np.ones(clean.shape[:2],np.uint8)*255
+    assert viewing_score(clean,mask)>viewing_score(noisy,mask)
+    assert viewing_score(clean,mask)>viewing_score(np.zeros_like(clean),mask)
+    saved=clean.copy();poly=[[0,0],[239,0],[239,79],[0,79]]
+    result,choice=choose_view({'clean':clean,'noise':noisy},poly)
+    assert choice['source']=='clean' and result.shape==clean.shape
+    assert np.array_equal(clean,saved)
+    rotated=cv2.boxPoints(((120,100),(160,30),30))
+    assert abs(viewing_angle(rotated)+30)<.1
+    assert viewing_angle(cv2.boxPoints(((120,100),(160,30),85)))==0
+    assert viewing_angle([[0,0],[50,0],[50,50],[0,50]])==0
+    block=cv2.resize(cv2.resize(clean,(12,4)),(240,80),interpolation=cv2.INTER_NEAREST)
+    block=np.where(block>150,255,0).astype(np.uint8)
+    _,choice=choose_view({'balanced':clean,'block':block},poly)
+    assert choice['source']=='balanced'
 
 
 def test_voc_duplicate_does_not_match_second_best_unused_gt():

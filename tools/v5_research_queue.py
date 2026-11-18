@@ -34,6 +34,23 @@ def write(path, state):
 
 
 def gpu_processes(gpu=2):
+    if gpu == 0:
+        # The server desktop's integration process is a persistent graphics
+        # client reported as C+G by NVML, not a training job. Keep the identity
+        # and small memory ceiling strict; every other process blocks the queue.
+        value = command(['nvidia-smi', '-i', '0', '--query-compute-apps=pid,process_name,used_gpu_memory',
+                         '--format=csv,noheader,nounits'])
+        result = set()
+        for line in value.splitlines():
+            fields = [part.strip() for part in line.split(',')]
+            if len(fields) != 3 or not fields[0].isdigit():
+                raise ValueError('Cannot safely parse GPU0 compute process list')
+            pid, name, memory = fields
+            desktop = (name == '/snap/snapd-desktop-integration/391/usr/bin/snapd-desktop-integration'
+                       and memory.isdigit() and int(memory) <= 32)
+            if not desktop:
+                result.add(int(pid))
+        return result
     value = command(['nvidia-smi', '-i', str(gpu), '--query-compute-apps=pid', '--format=csv,noheader,nounits'])
     return {int(line.strip()) for line in value.splitlines() if line.strip().isdigit()}
 
@@ -183,6 +200,14 @@ def run(plan_path, state_path):
             started = time.monotonic()
             with open(log_path, 'x') as log:
                 launch = ['docker', 'exec']
+                if gpu == 0:
+                    for key, value in {
+                        'OPENBLAS_NUM_THREADS': '1',
+                        'OMP_NUM_THREADS': '4',
+                        'MKL_NUM_THREADS': '4',
+                        'NUMEXPR_NUM_THREADS': '4',
+                    }.items():
+                        launch += ['-e', f'{key}={value}']
                 if allocator:
                     launch += ['-e', 'PYTORCH_CUDA_ALLOC_CONF=' + allocator]
                 process = subprocess.Popen([*launch, container, *wrapper], stdout=log, stderr=subprocess.STDOUT)

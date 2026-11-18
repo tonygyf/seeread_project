@@ -42,31 +42,30 @@ class PerceptualModulation(nn.Module):
         self.output_projection = nn.Conv2d(2 * channels, channels, 1)
 
     def forward(self, x):
-        snake = self.snake_projection(torch.cat((self.snake_h(x), self.snake_v(x)), 1))
-        # The ordinary convolution can overflow FP16 before BN normalizes it
-        # (real SynthText step85672). Retain AMP after this normalized branch.
+        # DSConv retains activation recomputation under AMP. Its normalized
+        # outputs are safe to cast; all unbounded PM projections stay FP32.
+        snake_features = torch.cat((self.snake_h(x), self.snake_v(x)), 1)
         with torch.autocast(x.device.type, enabled=False):
+            snake = self.snake_projection(snake_features.float())
             ordinary = self.conv(x.float())
-        value = torch.cat((ordinary.to(snake.dtype), snake), 1)
-        batch, channels, height, width = value.shape
-        q = F.relu(self.q(value)).flatten(2)
-        k = F.relu(self.k(value)).flatten(2)
-        # FP16 can overflow QK before the sqrt(N) division at 640px.
-        # Keep the paper expression; accumulate attention in FP32 under AMP.
-        with torch.autocast(x.device.type, enabled=False):
-            attention = torch.softmax((q.float() @ k.float().transpose(-2, -1)) / math.sqrt(height * width), dim=-1)
-            modulated = (attention @ value.float().flatten(2)).reshape(batch, channels, height, width)
-        modulated = modulated.to(value.dtype)
-        return self.output_projection(modulated)
+            value = torch.cat((ordinary, snake), 1)
+            batch, channels, height, width = value.shape
+            q = F.relu(self.q(value)).flatten(2)
+            k = F.relu(self.k(value)).flatten(2)
+            attention = torch.softmax((q @ k.transpose(-2, -1)) / math.sqrt(height * width), dim=-1)
+            modulated = (attention @ value.flatten(2)).reshape(batch, channels, height, width)
+            return self.output_projection(modulated)
 
 
 class SpatialConstraint(nn.Module):
     """Training-only mask encoder/decoder, with an explicit stop-grad target."""
 
-    def __init__(self, channels):
+    def __init__(self, channels, *, linear_decoder=False):
         super().__init__()
         self.encoder = cbr(2, channels)
-        self.decoder = nn.Sequential(cbr(channels, channels), cbr(channels, channels))
+        last = (nn.Sequential(nn.Conv2d(channels, channels, 3, padding=1, bias=False))
+                if linear_decoder else cbr(channels, channels))
+        self.decoder = nn.Sequential(cbr(channels, channels), last)
         self.reconstruction = nn.Conv2d(channels, 2, 1)
 
     def forward(self, image_feature, mask):
@@ -74,10 +73,11 @@ class SpatialConstraint(nn.Module):
             mask = F.one_hot(mask.long(), 2).permute(0, 3, 1, 2).float()
         if mask.ndim != 4 or mask.shape[1] != 2:
             raise ValueError('SCM requires a binary B,H,W mask or two-channel B,2,H,W target')
-        position = self.encoder(mask.to(image_feature))
-        position = F.interpolate(position, size=image_feature.shape[-2:], mode='bilinear', align_corners=False)
-        auxiliary = self.decoder(image_feature + position)
-        return dict(scm_mask=torch.sigmoid(self.reconstruction(auxiliary)), scm_sem=auxiliary)
+        with torch.autocast(image_feature.device.type, enabled=False):
+            position = self.encoder(mask.to(device=image_feature.device, dtype=torch.float32))
+            position = F.interpolate(position, size=image_feature.shape[-2:], mode='bilinear', align_corners=False)
+            auxiliary = self.decoder(image_feature.float() + position)
+            return dict(scm_mask=torch.sigmoid(self.reconstruction(auxiliary)), scm_sem=auxiliary)
 
 
 class SeeingDetector(nn.Module):
@@ -90,8 +90,11 @@ class SeeingDetector(nn.Module):
     """
 
     def __init__(self, channels=256, source_root='/opt/dscnet', kernel_size=9,
-                 pretrained=True, dsconv_factory=None, backbone_factory=None):
+                 pretrained=True, dsconv_factory=None, backbone_factory=None, architecture="legacy"):
         super().__init__()
+        if architecture not in ('legacy', 'figure2'):
+            raise ValueError('Seeing architecture must be legacy or figure2')
+        self.architecture = architecture
         if channels < 4:
             raise ValueError('Seeing channels must be at least four')
         if backbone_factory is None:
@@ -101,11 +104,13 @@ class SeeingDetector(nn.Module):
             backbone = backbone_factory()
         self.stem = nn.Sequential(backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool)
         self.layers = nn.ModuleList([backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4])
+        if architecture == 'figure2':
+            self.lateral_stem = nn.Conv2d(64, channels, 1)
         self.lateral = nn.ModuleList(nn.Conv2d(c, channels, 1) for c in (256, 512, 1024, 2048))
         self.pm = nn.ModuleList(PerceptualModulation(2 * channels, channels, source_root, kernel_size,
                                                    dsconv_factory) for _ in range(3))
         self.semantic_adapter = cbr(channels, channels)
-        self.scm = SpatialConstraint(channels)
+        self.scm = SpatialConstraint(channels, linear_decoder=architecture == 'figure2')
         self.text_head, self.center_head = self._head(channels, 2), self._head(channels, 2)
         self.geometry_head = self._head(channels, 2)
         self.register_buffer('mean', torch.tensor([.485, .456, .406]).view(1, 3, 1, 1))
@@ -115,7 +120,8 @@ class SeeingDetector(nn.Module):
             paper='https://arxiv.org/html/2404.08965v3',
             backbone='torchvision ResNet50 IMAGENET1K_V2' if pretrained else 'random ResNet50 sanity only',
             channels=channels, output_stride=4, scm_stride=16,
-            precision=dict(center_head='float32', text_head='float32', pm_conv_bn='float32'),
+            precision=dict(heads='float32', pm_projections='float32', scm='float32',
+                           fpn_fusion='float32', loss='float32'),
             attention=dict(axis='channel', activation='relu', scale='sqrt(spatial_locations)',
                            accumulation_dtype='float32', heads=1, learned_temperature=False, residual=False),
             assumptions=['three PM stages at stride16/8/4', 'two-axis DSC concat and 1x1 projection',
@@ -124,6 +130,18 @@ class SeeingDetector(nn.Module):
                          'main semantic adapter stays on image-only path', 'positive height via softplus',
                          'tangent angle pi-periodic via bounded scalar'],
         )
+        self.provenance['architecture'] = architecture
+        if architecture == 'figure2':
+            self.provenance['output_stride'] = 2
+            self.provenance['assumptions'] = [
+                'C4 is stride2 ResNet stem; F1 sums C1 and upsampled C0',
+                'three PM stages at stride8/4/2; SCM before all PM blocks',
+                'image-only adaptive(F1) added residually to F1',
+                'SCM decoder Conv-BN-ReLU-Conv; signed auxiliary semantics',
+                'two-axis DSC concat and 1x1 projection; post-attention 1x1 projection',
+                'SCM two-class one-hot mask input',
+                'positive height via softplus; tangent angle pi-periodic via bounded scalar',
+            ]
         self.provenance['dsconv'] = getattr(self.pm[0].snake_h, 'provenance', {})
 
     @staticmethod
@@ -137,24 +155,36 @@ class SeeingDetector(nn.Module):
             raise ValueError('Training SCM needs an explicit text mask')
         if with_scm and not self.training:
             raise ValueError('SCM is training-only; inference cannot consume a GT mask')
-        x = self.stem((image - self.mean) / self.std)
+        x = (image - self.mean) / self.std
+        for layer in list(self.stem)[:3]:
+            x = layer(x)
         features = []
+        if self.architecture == 'figure2':
+            with torch.autocast(image.device.type, enabled=False):
+                features.append(self.lateral_stem(x.float()))
+        x = self.stem[3](x)
         for layer, lateral in zip(self.layers, self.lateral):
             x = layer(x)
-            features.append(lateral(x))
+            with torch.autocast(image.device.type, enabled=False):
+                features.append(lateral(x.float()))
         f = features[-1]
         semantic = None
+        if self.architecture == 'figure2':
+            with torch.autocast(image.device.type, enabled=False):
+                f = F.interpolate(f, size=features[-2].shape[-2:], mode='bilinear', align_corners=False) + features[-2]
+                scm_input = f
+                semantic = self.semantic_adapter(f)
+                f = f + semantic
         for index, level in enumerate((2, 1, 0)):
             f = F.interpolate(f, size=features[level].shape[-2:], mode='bilinear', align_corners=False)
             f = self.pm[index](torch.cat((features[level], f), 1))
-            if index == 0:
+            if index == 0 and self.architecture == 'legacy':
                 scm_input = f
-                f = self.semantic_adapter(f)
+                with torch.autocast(image.device.type, enabled=False):
+                    f = self.semantic_adapter(f.float())
                 semantic = f
-        geometry = self.geometry_head(f)
-        # Both classification convolutions exceeded FP16 range before BN
-        # normalization on real SynthText batches (steps28860/32962).
         with torch.autocast(image.device.type, enabled=False):
+            geometry = self.geometry_head(f.float())
             text_logits = self.text_head(f.float())
             center_logits = self.center_head(f.float())
         out = dict(text=text_logits, center=center_logits,
@@ -173,4 +203,5 @@ def build_detector(config):
     return SeeingDetector(channels=int(cfg.get('channels', 256)),
                           source_root=cfg.get('source_root', '/opt/dscnet'),
                           kernel_size=int(cfg.get('kernel_size', 9)),
-                          pretrained=bool(cfg.get('pretrained', True)))
+                          pretrained=bool(cfg.get('pretrained', True)),
+                          architecture=cfg.get('architecture', 'legacy'))

@@ -17,6 +17,59 @@ from tools.v5_prepare_detection import (ctw_split, inspect_manifest, polygon_sta
 
 
 class DetectionPreparationTests(unittest.TestCase):
+    def test_fusion_synthesis_keeps_encoded_coordinates_with_exif_rotation(self):
+        from tools.data.prepare_v5_fusion_dev import encoded_rgb
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'rotated.jpg'
+            image=Image.new('RGB',(40,20),(120,80,40))
+            exif=image.getexif();exif[274]=6
+            image.save(path,exif=exif)
+            pixels=encoded_rgb(path)
+            self.assertEqual(pixels.shape,(20,40,3))
+            self.assertGreater(int(pixels[0,0,0]),int(pixels[0,0,2]))
+
+    def test_lated_audit_rejects_changed_frozen_fingerprint_registry(self):
+        from tools.v5_prepare_detection import audit_lated_protocol
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / 'raw/LATeD'
+            raw.mkdir(parents=True)
+            for split in ('train', 'test'):
+                (raw / f'{split}_list.txt').write_text('')
+            manifests = root / 'annotations'
+            manifests.mkdir()
+            frozen = {}
+            for split in ('train', 'val', 'test'):
+                path = manifests / f'latedspot_{split}.jsonl'
+                path.write_text('')
+                frozen[path.stem] = dict(sha256=sha256(path))
+            registry = manifests / 'image_fingerprints.jsonl'
+            registry.write_text('')
+            protocol = dict(frozen_manifests=frozen, image_fingerprints=dict(sha256=sha256(registry)))
+            (manifests / 'provenance.json').write_text(json.dumps(protocol))
+            registry.write_text(json.dumps(dict(path='raw/LATeD/image/changed.jpg', sha256='0' * 64)) + '\n')
+            with self.assertRaisesRegex(ValueError, 'Frozen image fingerprint registry changed'):
+                audit_lated_protocol(root, manifests)
+
+    def test_lated_audit_distinguishes_development_split_from_official_release(self):
+        from tools.v5_prepare_detection import lated_split_membership
+        official = dict(train=['a', 'b', 'c'], test=['x', 'y'])
+        def rows(names):
+            return [dict(image=f'raw/LATeD/image/{name}.jpg') for name in names]
+        splits = dict(train=rows(['a', 'b']), val=rows(['c']), test=rows(['x', 'y']))
+        result = lated_split_membership(splits, official)
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['training_images_withheld_for_dev'], 1)
+        splits['train'].append(splits['test'][0])
+        result = lated_split_membership(splits, official)
+        self.assertTrue(result['errors'])
+        self.assertEqual(result['overlap']['train__test'], ['x'])
+        splits['train'] = rows(['a', 'b'])
+        splits['test'] = rows(['x', 'x'])
+        result = lated_split_membership(splits, official)
+        self.assertEqual(result['duplicate_ids']['test'], ['x'])
+        self.assertTrue(result['errors'])
+
     def test_totaltext_keeps_uppercase_image_extension(self):
         from tools import convert_annotations as converter
         with tempfile.TemporaryDirectory() as directory:
@@ -30,7 +83,8 @@ class DetectionPreparationTests(unittest.TestCase):
                 "x: [[2 20 20 2]], y: [[2 2 14 14]], ornt: [u'h'], transcriptions: [u'TEXT']\n"
                 "x: [[2 20 2]], y: [[2 2 14]], ornt: [u'h'], transcriptions: [u'TRI']\n"
                 "x: [[2 20 20 2]], y: [[2 2 14 14]], ornt: [u\"h\\'\"], transcriptions: [u\\'ALL\\']\n"
-                "x: [[2 20 20 2]], y: [[2 2 14 14]], ornt: [], transcriptions: [u'and']\n")
+                "x: [[2 20 20 2]], y: [[2 2 14 14]], ornt: [], transcriptions: [u'and']\n"
+                "x: [[5]], y: [[340]], ornt: [u'#'], transcriptions: [u'#']\n")
             out = root / "annotations"
             out.mkdir()
             with patch.object(converter, "qa_sheet"):
@@ -41,6 +95,8 @@ class DetectionPreparationTests(unittest.TestCase):
             self.assertEqual(rows[0]["instances"][0]["text"], "TEXT")
             self.assertEqual([v["text"] for v in rows[0]["instances"]], ["TEXT", "TRI", "ALL", "and"])
             self.assertEqual(len(rows[0]["instances"][1]["poly"]), 3)
+            self.assertEqual(rows[0]['meta']['annotation_exclusions'], [dict(
+                id='img61#4', poly=[[5., 340.]], ignore=True, reason='invalid_polygon')])
 
     def test_totaltext_detection_ignore_follows_source_orientation(self):
         from tools import convert_annotations as converter

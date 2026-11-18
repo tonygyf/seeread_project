@@ -2,7 +2,13 @@
 
 当前主线：**分别复现 Reading 与 Seeing，再验证组合和消融。** 当前状态、论文差距与最新实验统一查看 [04 v5 对齐](docs/04_v5_alignment.md)。
 
-LATeD MVP 已提供[20张试标页](data/derived/v5/lated_mvp_20261026/pilot.html)和[整图识别预览](results/v5/fusion/lated_mvp_preview20_20261026/preview.html)。首批为200张训练＋100张开发，OCR草稿需人工确认；原完整LATeD检测器继续作为主线，退化结构候选保留为实验记录。使用LabLink/Tailscale时可直接打开[远程试标页](http://100.88.81.10:8765/pilot.html)与[远程识别预览](http://100.88.81.10:8766/preview.html)。导入转写、训练及验收命令见[04的MVP入口](docs/04_v5_alignment.md#lated-mvp实施与人工入口2026-10-26)。
+当前LATeD人工转写暂停，现有审核包保留；检测与已有带转写数据上的connector开发继续。后续仅在用户明确要求时push。
+
+当前整链固定 **See分类平衡100轮best＋既有Read裁剪域LoRA＋轮廓展开连接器**。使用LabLink/Tailscale直接打开[整图验证入口](http://100.88.81.10:8767/)：LATeD100张真实暗图，以及TotalText300张人工标注图的原亮图／固定合成暗图，均已完成逐实例推理。合成暗图检测F1 **14.71%**、spotting F1 **6.64%**、GT裁剪CER **57.71%**（内部匹配协议）。暗图预览中的配对亮图供显示核对；真实LATeD识别仍待人工转写真值。独立基线与旧结果保留，配置与验收边界见[04](docs/04_v5_alignment.md)。
+
+LATeD[20张试标页](http://100.88.81.10:8765/pilot.html)和300图审核包继续保留，转写按用户要求暂停，OCR草稿不作真值。
+
+[逐阶段核对](http://100.88.81.10:8767/stages/index.html)可查看700张图的See热图、GT／预测轮廓、connector展开裁剪、Self-DACE输出和识别文字；[训练核查页](http://100.88.81.10:8767/training.html)对照实际权重来源与论文配方，并展示同图明暗检测对拍。
 
 ## 文档
 

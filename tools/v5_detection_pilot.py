@@ -326,7 +326,7 @@ def detection_update_attempt(model, batch, optimizer, scaler, train, device, sta
     try:
         with torch.autocast(device.type, enabled=bool(train["amp"]) and device.type == "cuda"):
             prediction = model(batch["image"], with_scm=True, mask=batch["mask"])
-            losses = detection_loss(prediction, batch["targets"])
+            losses = detection_loss(prediction, batch["targets"], scm_target=batch["mask"])
             loss = sum(losses.values())
         if not torch.isfinite(loss):
             raise FloatingPointError("Nonfinite detection loss")

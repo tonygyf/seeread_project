@@ -1,0 +1,48 @@
+--- a/seeread/v5/seeing.py
++++ b/seeread/v5/seeing.py
+@@ -103,6 +103,7 @@
+             backbone = backbone_factory()
+         self.stem = nn.Sequential(backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool)
+         self.layers = nn.ModuleList([backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4])
++        self.lateral_stem = nn.Conv2d(64, channels, 1)
+         self.lateral = nn.ModuleList(nn.Conv2d(c, channels, 1) for c in (256, 512, 1024, 2048))
+         self.pm = nn.ModuleList(PerceptualModulation(2 * channels, channels, source_root, kernel_size,
+                                                    dsconv_factory) for _ in range(3))
+@@ -116,13 +117,13 @@
+             implementation='paper-guided reconstruction; not complete author implementation',
+             paper='https://arxiv.org/html/2404.08965v3',
+             backbone='torchvision ResNet50 IMAGENET1K_V2' if pretrained else 'random ResNet50 sanity only',
+-            channels=channels, output_stride=4, scm_stride=16,
++            channels=channels, output_stride=2, scm_stride=16,
+             precision=dict(center_head='float32', text_head='float32', pm_conv_bn='float32', geometry_head='float32'),
+             attention=dict(axis='channel', activation='relu', scale='sqrt(spatial_locations)',
+                            accumulation_dtype='float32', heads=1, learned_temperature=False, residual=False),
+-            assumptions=['three PM stages at stride16/8/4', 'two-axis DSC concat and 1x1 projection',
++            assumptions=['C4 is stride2 ResNet stem, F1 sums C1 and upsampled C0 (figure-derived assumptions)', 'three PM stages at stride8/4/2', 'two-axis DSC concat and 1x1 projection',
+                          'post-attention 1x1 projection', 'SCM two-class one-hot mask input', 'SCM decoder Conv-BN-ReLU-Conv; signed auxiliary semantics',
+-                         'SCM F1 is deepest feature upsampled to stride16 before all PM blocks',
++                         'SCM F1 sums C1 and upsampled C0 at stride16 before all PM blocks',
+                          'image-only adaptive(F1) is added residually to F1 before first PM', 'positive height via softplus',
+                          'tangent angle pi-periodic via bounded scalar'],
+         )
+@@ -139,13 +140,16 @@
+             raise ValueError('Training SCM needs an explicit text mask')
+         if with_scm and not self.training:
+             raise ValueError('SCM is training-only; inference cannot consume a GT mask')
+-        x = self.stem((image - self.mean) / self.std)
+-        features = []
++        x = (image - self.mean) / self.std
++        for layer in list(self.stem)[:3]:
++            x = layer(x)
++        features = [self.lateral_stem(x)]
++        x = self.stem[3](x)
+         for layer, lateral in zip(self.layers, self.lateral):
+             x = layer(x)
+             features.append(lateral(x))
+-        # Fig.2 branches SCM from F1 before all PM blocks; adaptive is residual.
+-        f = F.interpolate(features[-1], size=features[2].shape[-2:], mode='bilinear', align_corners=False)
++        # Fig.2 joins C1 with upsampled C0 at F1, then feeds C2/C3/C4 to PM.
++        f = F.interpolate(features[-1], size=features[-2].shape[-2:], mode='bilinear', align_corners=False) + features[-2]
+         scm_input = f
+         semantic = self.semantic_adapter(f)
+         f = f + semantic

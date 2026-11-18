@@ -93,9 +93,10 @@ class OfficialDSConv(nn.Module):
             source_sha256=digest, variant="official_2d_pro", if_offset=self.if_offset,
             kernel_size=kernel_size, morph=morph, extend_scope=extend_scope,
             pretrained_weights=None,
-            precision='deformed convolution and following GroupNorm in float32; normalized output returns to AMP dtype',
+            precision='offset prediction and normalization, deformed convolution and GroupNorm in float32; normalized output returns to AMP dtype',
             activation_memory='recompute DSConv under training autocast; no random/stateful layers inside operator',
-            compatibility=["coordinate device follows input", "disabled offsets explicitly zeroed"],
+            compatibility=["coordinate device follows input", "disabled offsets explicitly zeroed",
+                           "native grid_sample for large FP32 stride-2 maps"],
         )
 
     def forward(self, x):
@@ -114,7 +115,9 @@ class OfficialDSConv(nn.Module):
         # Upstream stores a plain device attribute; Module.to() cannot update it.
         self.operator.device = x.device
         if self.if_offset:
-            offsets = self.operator.tanh(self.operator.gn_offset(self.operator.offset_conv(x)))
+            # Real step148356: finite input, FP16 offset Conv overflows before GN.
+            with torch.autocast(x.device.type, enabled=False):
+                offsets = self.operator.tanh(self.operator.gn_offset(self.operator.offset_conv(x.float())))
         else:
             # Upstream forward does not honor if_offset.
             offsets = x.new_zeros((x.shape[0], 2 * self.operator.kernel_size, *x.shape[-2:]))
@@ -122,10 +125,13 @@ class OfficialDSConv(nn.Module):
             offsets, morph=self.operator.morph,
             extend_scope=self.operator.extend_scope, device=x.device,
         )
-        deformed = self._source.get_interpolated_feature(x, y_map, x_map)
+        # The stride-2 batch10 expanded FP32 grid exceeds cuDNN's supported
+        # grid-sampler size. Native PyTorch preserves the same sampling rule.
+        with torch.backends.cudnn.flags(enabled=False):
+            deformed = self._source.get_interpolated_feature(x, y_map, x_map)
         conv = self.operator.dsc_conv_x if self.operator.morph == 0 else self.operator.dsc_conv_y
         # Real step153502: finite deformed input, FP16 conv >65504 before GN.
-        # Keep offsets/grid sampling in their original precision and preserve
+        # Keep coordinate sampling and preserve
         # the upstream layers/parameter paths. Full-operator FP32 exceeds the
         # agreed training memory cap; only this unnormalized branch needs it.
         dtype = torch.get_autocast_dtype(x.device.type) if torch.is_autocast_enabled(x.device.type) else x.dtype

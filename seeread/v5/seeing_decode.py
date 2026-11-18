@@ -8,6 +8,7 @@ uses labels/SCM. Polygon vertices are scaled x/y independently on output.
 from __future__ import annotations
 import cv2
 import numpy as np
+from shapely.geometry import Polygon
 
 
 def _array(value):
@@ -50,7 +51,8 @@ def _positive_probability(logits):
 
 def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold=.5,
            rectangle_width=6., sample_step=3., max_samples=64, close_kernel=3,
-           min_component_area=3, min_polygon_area=3, max_detections=100, keep_all_contours=False):
+           min_component_area=3, min_polygon_area=3, max_detections=100, keep_all_contours=False,
+           center_mask_mode='intersection'):
     """One image -> list of {'poly': Nx2 image-pixel ndarray, 'score': float}.
 
     Specify exactly one of image_hw=(H,W) or stride=scalar/(stride_y,stride_x).
@@ -65,6 +67,8 @@ def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold
         raise ValueError('close_kernel must be zero or a positive odd integer')
     if not 0 <= text_threshold <= 1 or not 0 <= center_threshold <= 1:
         raise ValueError('Probability thresholds must lie in [0,1]')
+    if center_mask_mode not in ('intersection', 'center_only'):
+        raise ValueError('center_mask_mode must be intersection or center_only')
     text, center = _single(pred['text'], 2), _single(pred['center'], 2)
     height, angle = _single(pred['height'], 1)[0], _single(pred['angle'], 1)[0]
     if text.shape[1:] != center.shape[1:] or text.shape[1:] != height.shape or height.shape != angle.shape:
@@ -80,7 +84,10 @@ def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold
     if not np.isfinite(scale).all() or (scale <= 0).any():
         raise ValueError('Image scale must be positive and finite')
     tp, cp = _positive_probability(text), _positive_probability(center)
-    mask = ((tp >= text_threshold) & (cp >= center_threshold)).astype(np.uint8)
+    mask = cp >= center_threshold
+    if center_mask_mode == 'intersection':
+        mask &= tp >= text_threshold
+    mask = mask.astype(np.uint8)
     n, labels = cv2.connectedComponents(mask, connectivity=8)
     results = []
     for component in range(1, n):
@@ -119,6 +126,17 @@ def decode(pred, stride=None, image_hw=None, text_threshold=.5, center_threshold
             polygon = cv2.approxPolyDP(contour, .005 * cv2.arcLength(contour, True), True).reshape(-1, 2).astype(np.float32)
             if len(polygon) < 3:
                 continue
+            shape = Polygon(polygon)
+            if not shape.is_valid:
+                # Raster contours can touch or cross themselves; evaluators reject them.
+                shape = shape.buffer(0)
+                if shape.is_empty:
+                    continue
+                if shape.geom_type == 'MultiPolygon':
+                    shape = max(shape.geoms, key=lambda part: part.area)
+                if shape.area < min_polygon_area:
+                    continue
+                polygon = np.asarray(shape.exterior.coords[:-1], dtype=np.float32)
             interior = np.zeros((fh, fw), np.uint8)
             cv2.fillPoly(interior, [contour], 1)
             results.append(dict(poly=polygon * scale, score=float(tp[interior > 0].mean())))

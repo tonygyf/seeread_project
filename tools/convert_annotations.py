@@ -214,7 +214,7 @@ def _tt_texts(s):
     return [a or b for a, b in re.findall(r"u?'([^']*)'|u?\"([^\"]*)\"", s)]
 
 
-def conv_totaltext(raw, out, root, split):
+def totaltext_rows(raw, split):
     base = os.path.join(raw, "TotalText")
     gt_dir = os.path.join(base, "txt_format", split.capitalize())
     image_dir = os.path.join(base, "Images", split.capitalize())
@@ -237,6 +237,7 @@ def conv_totaltext(raw, out, root, split):
         if buf:
             joined.append(buf)
         ins = []
+        exclusions = []
         for li, line in enumerate(joined):
             m = TT_RE.match(line.strip())
             if not m:
@@ -248,6 +249,7 @@ def conv_totaltext(raw, out, root, split):
             p = poly_list([c for pt in xy for c in pt])
             if p is None:
                 STATS["tt_instance_skipped"] += 1
+                exclusions.append(dict(id=f'{nid}#{li}', poly=xy, ignore=ornt == '#', reason='invalid_polygon'))
                 continue
             text = (_tt_texts(tr) + [""])[0]
             # Author column6 is the don't-care marker, independent of transcription.
@@ -257,7 +259,15 @@ def conv_totaltext(raw, out, root, split):
             if dontcare and text:
                 rec["src"] = text
             ins.append(rec)
-        rows.append(make_row(rel, ins, dict(source="TotalText", illum_kind="lit", scene="totaltext", id=nid)))
+        meta = dict(source="TotalText", illum_kind="lit", scene="totaltext", id=nid)
+        if exclusions:
+            meta['annotation_exclusions'] = exclusions
+        rows.append(make_row(rel, ins, meta))
+    return rows
+
+
+def conv_totaltext(raw, out, root, split):
+    rows = totaltext_rows(raw, split)
     write_jsonl(os.path.join(out, f"totaltext_{split}.jsonl"), rows)
     summary(f"totaltext_{split}", rows)
     qa_sheet(os.path.join("results", "qa", f"convert_totaltext_{split}.png"), root, rows, tag=f"totaltext {split}")

@@ -1,0 +1,79 @@
+{
+  "experiment": {
+    "version": 5,
+    "id": "stable_resume_MLT17_20261104",
+    "role": "healthy step148200 precision migration; not from-scratch reproduction"
+  },
+  "stage": {
+    "name": "mlt17",
+    "epochs": 100,
+    "init_checkpoint": "results/v5/detection/SynthText_stable_resume_20261104/last.pt"
+  },
+  "detector": {
+    "type": "seeing",
+    "channels": 256,
+    "pretrained": true,
+    "source_root": "/opt/dscnet",
+    "kernel_size": 9,
+    "architecture": "figure2"
+  },
+  "data": {
+    "root": "data",
+    "train_manifest": "data/annotations/v5/detection/mlt17_train.reference.json",
+    "dev_manifest": "data/annotations/v5/detection/mlt17_dev.jsonl",
+    "protocol_provenance": "data/annotations/v5/detection/mlt17_train.reference.json",
+    "image_fingerprints": "data/annotations/v5/detection/mlt17_image_fingerprints.jsonl",
+    "require_fingerprint": true,
+    "image_hw": [
+      640,
+      640
+    ],
+    "feature_hw": [
+      320,
+      320
+    ],
+    "center_shrink": 0.3,
+    "augment": {
+      "flip_p": 0.5,
+      "rotate_p": 0.5,
+      "rotate_degrees": 10.0,
+      "color_p": 0.5,
+      "color_strength": 0.2,
+      "noise_p": 0.3,
+      "noise_std": 0.02,
+      "scale_crop_p": 1.0,
+      "scale_min": 0.75,
+      "scale_max": 1.5
+    }
+  },
+  "train": {
+    "device": "cuda:0",
+    "out_dir": "results/v5/detection/MLT17_stable_resume_20261104",
+    "seed": 0,
+    "memory_fraction": 0.8,
+    "max_seconds": 0,
+    "max_steps": 0,
+    "batch_size": 10,
+    "val_batch_size": 2,
+    "workers": 4,
+    "lr": 0.0001,
+    "lr_step_epochs": 100,
+    "lr_gamma": 0.1,
+    "amp": true,
+    "grad_clip": 5.0,
+    "val_every_epochs": 1,
+    "save_every_updates": 200,
+    "log_every": 20
+  },
+  "decoder": {
+    "text_threshold": 0.5,
+    "center_threshold": 0.5,
+    "rectangle_width": 12.0,
+    "sample_step": 6.0,
+    "max_samples": 64,
+    "close_kernel": 5,
+    "min_component_area": 12,
+    "min_polygon_area": 12,
+    "max_detections": 100
+  }
+}

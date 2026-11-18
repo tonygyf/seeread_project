@@ -1,0 +1,7 @@
+{
+  "stages": [
+    "stable_resume_synth_20261104.json",
+    "stable_resume_mlt_20261104.json",
+    "stable_resume_lated_20261104.json"
+  ]
+}

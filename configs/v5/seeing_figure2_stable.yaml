@@ -1,0 +1,26 @@
+_base_: seeing_stage_base.yaml
+experiment:
+  id: Seeing_figure2_stable_20261104
+  role: figure-derived architecture; FP32 PM/SCM/loss repair; not launched
+stage:
+  name: synthtext
+  epochs: 2
+  init_checkpoint: null
+detector:
+  architecture: figure2
+data:
+  feature_hw: [320, 320]
+  augment:
+    scale_crop_p: 1.0
+    scale_min: 0.75
+    scale_max: 1.5
+train:
+  out_dir: results/v5/detection/SynthText_figure2_stable_20261104
+  memory_fraction: 0.8
+# Preserve the previous stride-2 candidate's input-space decode geometry.
+decoder:
+  rectangle_width: 12.0
+  sample_step: 6.0
+  close_kernel: 5
+  min_component_area: 12
+  min_polygon_area: 12

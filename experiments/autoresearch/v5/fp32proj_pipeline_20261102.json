@@ -1,0 +1,7 @@
+{
+  "stages": [
+    "fp32proj_synth_full_20261102.json",
+    "fp32proj_mlt_full_20261102.json",
+    "fp32proj_lated_full_20261102.json"
+  ]
+}

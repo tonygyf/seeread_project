@@ -5,7 +5,8 @@ from torch.nn import functional as F
 
 
 def _masked_mean(values, mask):
-    mask = mask.to(dtype=values.dtype)
+    values = values.float()
+    mask = mask.to(dtype=torch.float32)
     return (values * mask).sum() / mask.sum().clamp_min(1)
 
 
@@ -17,7 +18,7 @@ def _valid_at_scale(valid, size):
     return 1 - F.adaptive_max_pool2d(ignored, size)[:, 0]
 
 
-def detection_loss(pred, targets):
+def detection_loss(pred, targets, *, scm_target=None):
     """Batched targets; all ignore pixels are excluded from every denominator.
 
     height is direct full height in feature pixels. angle is tangent radians,
@@ -25,6 +26,9 @@ def detection_loss(pred, targets):
     Auxiliary semantics are detached, so SCM reconstruction trains that branch
     while semantic MSE supervises sem_main only.
     """
+    # Cast BEFORE elementwise squares/subtractions, not after a half overflow.
+    pred = {k: v.float() if torch.is_tensor(v) and v.is_floating_point() else v
+            for k, v in pred.items()}
     device = pred['text'].device
     gt = {k: torch.as_tensor(v, device=device) for k, v in targets.items()}
     if gt['text'].ndim == 2:
@@ -46,8 +50,15 @@ def detection_loss(pred, targets):
         scm = pred['scm_mask']
         if scm.shape[1] != 2:
             raise ValueError('scm_mask must contain two sigmoid probability channels')
+        if scm_target is None:
+            raise ValueError('SCM reconstruction requires the input-resolution text mask')
         size = scm.shape[-2:]
-        label = F.interpolate(gt['text'][:, None].float(), size=size, mode='nearest')[:, 0].long()
+        source = torch.as_tensor(scm_target, device=device)
+        if source.ndim == 2:
+            source = source[None]
+        if source.ndim != 3 or source.shape[0] != scm.shape[0]:
+            raise ValueError('SCM reconstruction mask must have shape B,H,W')
+        label = F.interpolate(source[:, None].float(), size=size, mode='nearest')[:, 0].long()
         weight = _valid_at_scale(valid, size)
         onehot = F.one_hot(label, 2).permute(0, 3, 1, 2).to(scm.dtype)
         losses['scm_mask'] = _masked_mean((scm - onehot).abs().mean(1), weight)

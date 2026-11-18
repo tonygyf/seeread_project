@@ -12,6 +12,41 @@ class FakeDSConv(nn.Conv2d):
 
 
 class SeeingTests(unittest.TestCase):
+    def test_figure2_shapes_mask_isolation_and_gradient_routing(self):
+        torch.set_num_threads(1)
+        model = SeeingDetector(channels=4, pretrained=False, dsconv_factory=FakeDSConv,
+                               architecture='figure2').train()
+        image = torch.rand(2, 3, 64, 96)
+        with torch.autocast('cpu', dtype=torch.bfloat16):
+            zero = model(image, with_scm=True, mask=torch.zeros(2, 64, 96, dtype=torch.long))
+            one = model(image, with_scm=True, mask=torch.ones(2, 64, 96, dtype=torch.long))
+        self.assertEqual(one['text'].shape, (2, 2, 32, 48))
+        self.assertEqual(one['sem_main'].shape[-2:], (4, 6))
+        for key in ('text', 'center', 'height', 'angle'):
+            torch.testing.assert_close(zero[key], one[key], rtol=0, atol=0)
+            self.assertTrue(torch.isfinite(one[key]).all())
+        (one['sem_main'] - one['scm_sem'].detach()).square().mean().backward()
+        self.assertTrue(all(p.grad is None for p in model.scm.parameters()))
+        self.assertTrue(any(p.grad is not None for p in model.semantic_adapter.parameters()))
+
+    def test_pm_projections_keep_large_finite_values_under_amp(self):
+        torch.set_num_threads(1)
+        for name in ('q', 'k', 'output_projection'):
+            with self.subTest(projection=name):
+                torch.manual_seed(4)
+                model = PerceptualModulation(4, 4, source_root='', dsconv_factory=FakeDSConv).eval()
+                with torch.no_grad():
+                    getattr(model, name).weight.zero_()
+                    getattr(model, name).bias.fill_(80000.)
+                image = torch.rand(1, 4, 8, 8, requires_grad=True)
+                reference = model(image).detach()
+                with torch.autocast('cpu', dtype=torch.float16):
+                    result = model(image)
+                self.assertTrue(torch.isfinite(result).all())
+                torch.testing.assert_close(result.float(), reference, rtol=.02, atol=.02)
+                result.mean().backward()
+                self.assertTrue(torch.isfinite(image.grad).all())
+
     def test_pm_convolution_stays_finite_before_batch_normalization(self):
         torch.set_num_threads(1)
         torch.manual_seed(4)

@@ -1,0 +1,47 @@
+{
+  "container": "seeread-v5-stable-fresh-20261104",
+  "gpu": 2,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "fixed recipe; final epoch250 test only; no test-based tuning",
+  "jobs": [
+    {
+      "id": "fresh_full_pipeline",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/seeing_stable_20261104",
+        "--pipeline",
+        "experiments/autoresearch/v5/stable_fresh_pipeline_20261104.json"
+      ],
+      "report": "results/v5/detection/LATeD_stable_fresh_20261104/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/stable_fresh_20261104.log",
+      "timeout_seconds": 2592000
+    },
+    {
+      "id": "fresh_locked_epoch250_test500",
+      "argv": [
+        "python",
+        "tools/v5_eval_lated_test.py",
+        "--runtime",
+        "results/v5/runtime/seeing_stable_20261104",
+        "--checkpoint",
+        "results/v5/detection/LATeD_stable_fresh_20261104/last.pt",
+        "--output",
+        "results/v5/diagnostics/lated_test500_stable_fresh_20261104",
+        "--device",
+        "cuda:0"
+      ],
+      "report": "results/v5/diagnostics/lated_test500_stable_fresh_20261104/run.json",
+      "log": "results/v5/queue_logs/stable_fresh_test500_20261104.log",
+      "timeout_seconds": 7200
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "container": "seeread-v5-gpu0-fp32proj-20261102",
+  "gpu": 0,
+  "cuda_allocator_config": "expandable_segments:True",
+  "scope": "Numerical repair of final PM FP16 overflow; migrated healthy step146200; original training recipe; explicit non-bitwise precision migration.",
+  "jobs": [
+    {
+      "id": "resume_fp32proj_full_pipeline",
+      "argv": [
+        "python",
+        "tools/v5_recover_lated.py",
+        "--runtime",
+        "results/v5/runtime/seeing_final_scm_fp32proj_20261102",
+        "--pipeline",
+        "experiments/autoresearch/v5/fp32proj_pipeline_20261102.json",
+        "--resume",
+        "results/v5/detection/SynthText_final_scm_fp32proj_20261102/last.pt"
+      ],
+      "report": "results/v5/detection/LATeD_final_scm_fp32proj_20261102/status.json",
+      "report_status_path": [
+        "state",
+        "status"
+      ],
+      "acceptable_report_statuses": [
+        "stage_complete"
+      ],
+      "log": "results/v5/queue_logs/20261102_fp32proj_resume_gpu0.log",
+      "timeout_seconds": 2592000
+    }
+  ]
+}
