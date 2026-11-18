@@ -1,5 +1,32 @@
 # 04 v5 论文对齐与实验状态
 
+**2026-10-27备选基线工作区：**分支 `exp/darktext-baseline` 从提交 `29310d9` 独立创建；原工作区的未提交更改没有自动复制。本文后面的运行状态是该提交时的历史快照，当前两条原See训练已按用户要求停止。上游源码固定为 `fuhao7i/DarkText-private` 的 `1c86bdfa53d06e3b164bc1cf4ab622c3aafe6365`，工作区位于原项目 `results/v5/source_snapshots/darktext_pde_1c86bdf`，不将私有源码提交或推送。
+
+新入口 `tools/darktext_baseline.py` 运行该版本的VGG原始检测器，不启用PDE；加载已有完整checkpoint时跳过多余的ImageNet下载，并用strict检查权重。输出原图坐标的多边形，源检测器不输出置信度，因此score为null，尚未接入现有需要检测分数的connector评测。此入口不是2024 See模型；PDE为后续可单独验收的候选，不与VGG独立基线混算。
+
+| 本地权重 | checkpoint epoch | SHA256 | 状态 |
+|---|---:|---|---|
+| `/home/gyf/DarkText-private/checkpoints/pretrained/pretrained/textgraph_vgg_2964.pth` | 2964 | `c1758e64a5896c6ba9bee683bd8306c04f9ba4d0a2370237d795377c6a3cf913` | CTW预训练；已通过模型strict加载及64×64全黑CPU合成输入冒烟 |
+| `/home/gyf/DarkText-private/checkpoints/LATeD/textgraph_vgg_200.pth` | 200 | `a147b371fec05eac9dd3a3dc706c06545adc2749ca493c2fa75d629b961f621e` | 已通过真实模型strict加载和64×64全黑CPU合成输入冒烟；无真实集成绩 |
+
+上游PDE分支是当前最新完整代码，但其文档的LATeD 500张结果属于后续VGG/PDE，不能写成2024 See复现。文档提及的6015权重本地未找到，PDE几何/扩散权重也未找到。老师本地另一历史结果文件F1 66.74%，没有锁定生成它的代码、权重与清单，不能归给epoch200。保留原官方test封存边界；只有固定开发集可用于后续核验，正式test须锁定后再测。
+
+老师目录与SeeRead的LATeD官方train/test列表逐字节一致，各有1500张jpg和1500份标签；此次只比对名单及数量，未重新逐字节核对两份数据。目标开发集仍须使用既有100张开发清单而非老师原数据加载器的test列表。
+
+隔离CPU冒烟命令，不使用任何真实图像或GPU：
+
+```bash
+docker run --rm --network none --memory=6g --cpus=2 --pids-limit=128 \
+  -e OPENBLAS_NUM_THREADS=1 -e OMP_NUM_THREADS=2 -e PYTHONPATH=/upstream \
+  -v /home/gyf/seeread_project/results/v5/source_snapshots/darktext_pde_1c86bdf:/upstream:ro \
+  -v /home/gyf/seeread_project/results/v5/worktrees/darktext_baseline:/branch:ro \
+  -v /home/gyf/DarkText-private/checkpoints:/checkpoints:ro \
+  -w /upstream --entrypoint python darktext:dev /branch/tools/darktext_baseline.py \
+  --checkpoint /checkpoints/LATeD/textgraph_vgg_200.pth --synthetic-smoke
+```
+
+## 历史记录
+
 更新：2026-10-26（北京时间）。**当前保留原完整LATeD best与独立Reading基线；两个结构候选退出MVP主线。See尚未完成论文同协议test验收；Read R0/R4的LSTR CER已在3个百分点内。100张dev＋200张train的独立转写包、20张试标页及3041行OCR草稿已交付；整图多实例识别已跑通，人工转写完成前不报告真实LATeD识别成绩。分类平衡与原结构正在GPU1做同预算25轮对照，GPU3已让出给检测到的其他任务。**
 
 ### MVP验收表
